@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String        @id
+  email        String?
+  monthBudget  Float         @default(1500)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  transactions Transaction[]
+  recurring    Recurring[]
+}
+
+model Transaction {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  sub       String
+  note      String?
+  cat       String
+  amount    Float
+  date      DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId, date])
+}
+
+model Recurring {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       String
+  title      String
+  sub        String
+  note       String?
+  cat        String
+  amount     Float
+  dayOfMonth Int
+  active     Boolean  @default(true)
+  startYm    String
+  lastRunYm  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, active])
+}
