@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useUser } from "@clerk/nextjs";
 import { useCurrency } from "@/lib/currency";
 import {
@@ -23,15 +24,26 @@ import MonthAtAGlance from "@/components/dashboard/MonthAtAGlance";
 import StreakCard from "@/components/dashboard/StreakCard";
 import CategoryBudgets from "@/components/dashboard/CategoryBudgets";
 import GoalsDashlet from "@/components/dashboard/GoalsDashlet";
-import AddTransactionModal from "@/components/dashboard/AddTransactionModal";
-import AddRecurringModal, { type RecurringInput } from "@/components/dashboard/AddRecurringModal";
 import RecurringCard, { type Recurring } from "@/components/dashboard/RecurringCard";
 import AddFAB from "@/components/dashboard/AddFAB";
 import DashboardSkeleton from "@/components/dashboard/DashboardSkeleton";
 import InsightsCard from "@/components/dashboard/InsightsCard";
-import { CustomizeDrawer } from "@/components/dashboard/CustomizePanel";
 import { computeInsights } from "@/lib/insights";
 import { RANGE_DAYS, RANGE_LABELS, useDashboardPrefs } from "@/lib/dashboard-prefs";
+import type { RecurringInput } from "@/components/dashboard/AddRecurringModal";
+
+const AddTransactionModal = dynamic(
+  () => import("@/components/dashboard/AddTransactionModal"),
+  { ssr: false },
+);
+const AddRecurringModal = dynamic(
+  () => import("@/components/dashboard/AddRecurringModal"),
+  { ssr: false },
+);
+const CustomizeDrawer = dynamic(
+  () => import("@/components/dashboard/CustomizePanel").then((m) => m.CustomizeDrawer),
+  { ssr: false },
+);
 
 const DEFAULT_BUDGET = 1500;
 
@@ -58,27 +70,34 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const [txRes, meRes, recRes] = await Promise.all([
-        fetch("/api/transactions"),
-        fetch("/api/me"),
-        fetch("/api/recurring"),
-      ]);
-      if (cancelled) return;
-      if (txRes.ok) {
-        const rows = await txRes.json();
+
+    // Transactions drive the initial skeleton → render as soon as they arrive.
+    fetch("/api/transactions")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((rows) => {
+        if (cancelled || !rows) return;
         setTxns(rows.map(fromDbTransaction));
-      }
-      if (meRes.ok) {
-        const me = await meRes.json();
+        setLoading(false);
+      })
+      .catch(() => { if (!cancelled) setLoading(false); });
+
+    // Budget + recurring populate independently — side rail updates when they land.
+    fetch("/api/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((me) => {
+        if (cancelled || !me) return;
         if (typeof me.monthBudget === "number") setMonthBudget(me.monthBudget);
-      }
-      if (recRes.ok) {
-        const rows = await recRes.json();
+      })
+      .catch(() => {});
+
+    fetch("/api/recurring")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((rows) => {
+        if (cancelled || !rows) return;
         setRecurring(rows);
-      }
-      if (!cancelled) setLoading(false);
-    })();
+      })
+      .catch(() => {});
+
     return () => { cancelled = true; };
   }, []);
 
@@ -456,17 +475,23 @@ export default function DashboardPage() {
       </div>
 
       <AddFAB onClick={() => setModalOpen(true)} />
-      <AddTransactionModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onAdd={addTxn}
-      />
-      <AddRecurringModal
-        open={recurringModalOpen}
-        onClose={() => setRecurringModalOpen(false)}
-        onAdd={addRecurring}
-      />
-      <CustomizeDrawer open={customizeOpen} onClose={() => setCustomizeOpen(false)} />
+      {modalOpen && (
+        <AddTransactionModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          onAdd={addTxn}
+        />
+      )}
+      {recurringModalOpen && (
+        <AddRecurringModal
+          open={recurringModalOpen}
+          onClose={() => setRecurringModalOpen(false)}
+          onAdd={addRecurring}
+        />
+      )}
+      {customizeOpen && (
+        <CustomizeDrawer open={customizeOpen} onClose={() => setCustomizeOpen(false)} />
+      )}
     </>
   );
 }

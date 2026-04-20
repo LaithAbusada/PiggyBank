@@ -119,8 +119,11 @@ export default function Signup() {
             alt="Piggy bank with money"
             width={500}
             height={500}
+            sizes="(max-width: 768px) 0px, 500px"
+            quality={80}
             className="object-contain"
             priority
+            fetchPriority="high"
           />
         </div>
       </div>
@@ -149,6 +152,8 @@ export default function Signup() {
                 alt="PiggyBank logo"
                 width={80}
                 height={56}
+                priority
+                fetchPriority="high"
               />
             </div>
 
