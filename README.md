@@ -1,36 +1,84 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# 🐷 PiggyBank
+
+A personal finance tracker for logging transactions, managing recurring expenses, and staying on top of a monthly budget.
+
+**Live:** [piggy-bank-taupe-xi.vercel.app](https://piggy-bank-taupe-xi.vercel.app/)
+
+---
+
+## Features
+
+- **Transactions** — log one-off income and expenses with categories, notes, and dates
+- **Recurring** — schedule repeating items by day-of-month; auto-rolls forward each month
+- **Dashboard** — budget overview with calculator, calendar, file manager, invoicing, and settings
+- **Auth** — Clerk-backed sign-in / sign-up with protected routes via middleware
+- **Multi-currency** — pick your preferred currency from the settings
+
+## Tech Stack
+
+| Layer    | Tool                          |
+| -------- | ----------------------------- |
+| Framework | Next.js 16 (App Router) + React 19 |
+| Styling  | Tailwind CSS 4                |
+| Auth     | Clerk                         |
+| Database | PostgreSQL via Prisma 6       |
+| Language | TypeScript                    |
+| Hosting  | Vercel                        |
 
 ## Getting Started
 
-First, run the development server:
+Clone and install:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/LaithAbusada/PiggyBank.git
+cd PiggyBank
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Create a `.env.local` with:
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+```env
+DATABASE_URL="postgresql://..."
+DIRECT_URL="postgresql://..."
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_..."
+CLERK_SECRET_KEY="sk_..."
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Push the schema and start dev:
 
-## Learn More
+```bash
+npx prisma migrate dev
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open [http://localhost:3000](http://localhost:3000).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+app/
+  api/              # transactions, recurring, user routes
+  dashboard/        # calculator, calendar, files, invoicing, settings, support
+  login/ signup/    # Clerk auth pages
+  page.tsx          # landing
+components/
+  landing/          # marketing sections
+  dashboard/        # sidebar, widgets
+prisma/
+  schema.prisma     # User, Transaction, Recurring
+lib/                # shared helpers
+middleware.ts       # route protection
+```
 
-## Deploy on Vercel
+## Scripts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Command         | What it does                         |
+| --------------- | ------------------------------------ |
+| `npm run dev`   | Start the dev server                 |
+| `npm run build` | Production build                     |
+| `npm start`     | Run the production build             |
+| `npm run lint`  | Lint with ESLint                     |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deployment
+
+Auto-deployed to Vercel on push to `main` → [piggy-bank-taupe-xi.vercel.app](https://piggy-bank-taupe-xi.vercel.app/)
