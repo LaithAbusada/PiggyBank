@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { prisma } from "./prisma";
+import { CURRENCIES, isCurrencyCode } from "./currencies";
 
 export function hashSms(raw: string, receivedAt: Date): string {
   return createHash("sha256")
@@ -43,8 +44,8 @@ export async function parseSms(userId: string, raw: string): Promise<ParsedSms |
     if (!amountRe) continue;
     const am = amountRe.exec(raw);
     if (!am || !am[1]) continue;
-    const amount = parseFloat(am[1].replace(/,/g, ""));
-    if (!isFinite(amount)) continue;
+    const rawAmount = parseFloat(am[1].replace(/,/g, ""));
+    if (!isFinite(rawAmount)) continue;
 
     const merchantRe = safeRegex(rule.merchantRegex);
     if (!merchantRe) continue;
@@ -54,6 +55,9 @@ export async function parseSms(userId: string, raw: string): Promise<ParsedSms |
     if (!merchant) continue;
 
     if (rule.type !== "in" && rule.type !== "out") continue;
+
+    const rate = isCurrencyCode(rule.currency) ? CURRENCIES[rule.currency].rate : 1;
+    const amount = rate ? rawAmount / rate : rawAmount;
 
     return {
       type: rule.type as "in" | "out",

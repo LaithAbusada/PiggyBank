@@ -69,6 +69,7 @@ model ParseRule {
   merchantRegex   String
   type            String
   defaultCategory String
+  currency        String   @default("USD")
   priority        Int      @default(0)
   active          Boolean  @default(true)
   createdAt       DateTime @default(now())

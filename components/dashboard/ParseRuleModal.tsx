@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { IconClose } from "@/lib/icons";
 import { CATEGORIES_OPTIONS } from "@/lib/dashboard-data";
+import { CURRENCIES, CURRENCY_CODES, type CurrencyCode } from "@/lib/currencies";
 
 export type ParseRuleData = {
   id?: string;
@@ -13,6 +14,7 @@ export type ParseRuleData = {
   merchantRegex: string;
   type: "in" | "out";
   defaultCategory: string;
+  currency: CurrencyCode;
   priority: number;
   active: boolean;
 };
@@ -33,6 +35,7 @@ const emptyRule: ParseRuleData = {
   merchantRegex: "",
   type: "out",
   defaultCategory: "Other",
+  currency: "USD",
   priority: 0,
   active: true,
 };
@@ -287,7 +290,7 @@ export default function ParseRuleModal({ open, onClose, onSave, initial, sampleR
             />
           </Field>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="Type">
               <select
                 style={fieldStyle}
@@ -310,6 +313,22 @@ export default function ParseRuleModal({ open, onClose, onSave, initial, sampleR
                   </option>
                 ))}
                 <option value="Other">Other</option>
+              </select>
+            </Field>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="Currency in SMS" hint="The amount the SMS shows will be converted from this to USD before storing.">
+              <select
+                style={fieldStyle}
+                value={rule.currency}
+                onChange={(e) => setRule({ ...rule, currency: e.target.value as CurrencyCode })}
+              >
+                {CURRENCY_CODES.map((c) => (
+                  <option key={c} value={c}>
+                    {c} · {CURRENCIES[c].name}
+                  </option>
+                ))}
               </select>
             </Field>
             <Field label="Priority" hint="Higher wins first.">
@@ -353,7 +372,17 @@ export default function ParseRuleModal({ open, onClose, onSave, initial, sampleR
               <div style={{ marginTop: 10, display: "grid", gap: 4 }}>
                 <TestRow label="Sender filter" res={senderOk} />
                 <TestRow label="Content filter" res={contentOk} />
-                <TestRow label="Amount" res={amountRes} />
+                <TestRow label={`Amount (${rule.currency})`} res={amountRes} />
+                {amountRes.ok && rule.currency !== "USD" && (() => {
+                  const raw = parseFloat(amountRes.value.replace(/,/g, ""));
+                  const usd = isFinite(raw) ? raw / CURRENCIES[rule.currency].rate : NaN;
+                  return (
+                    <TestRow
+                      label="Stored as (USD)"
+                      res={isFinite(usd) ? { ok: true, value: usd.toFixed(4) } : { ok: false, error: "—" }}
+                    />
+                  );
+                })()}
                 <TestRow label="Merchant" res={merchantRes} />
                 <div
                   style={{

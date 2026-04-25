@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { IconClose } from "@/lib/icons";
 import { CATEGORIES_OPTIONS } from "@/lib/dashboard-data";
+import { useCurrency } from "@/lib/currency";
 
 export type PromoteInput = {
   type: "in" | "out";
@@ -27,6 +28,7 @@ const labelStyle: React.CSSProperties = {
 };
 
 export default function PromotePendingModal({ open, onClose, onPromote, pending }: Props) {
+  const { sym, rate } = useCurrency();
   const [type, setType] = useState<"in" | "out">("out");
   const [title, setTitle] = useState("");
   const [cat, setCat] = useState("Other");
@@ -52,9 +54,10 @@ export default function PromotePendingModal({ open, onClose, onPromote, pending 
     e.preventDefault();
     const amt = parseFloat(amount);
     if (!isFinite(amt) || !title.trim()) return;
+    const stored = rate ? amt / rate : amt;
     setSubmitting(true);
     try {
-      await onPromote({ type, title: title.trim(), cat, amount: amt });
+      await onPromote({ type, title: title.trim(), cat, amount: stored });
       onClose();
     } finally {
       setSubmitting(false);
@@ -172,7 +175,7 @@ export default function PromotePendingModal({ open, onClose, onPromote, pending 
           </label>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={labelStyle}>Amount</span>
+              <span style={labelStyle}>Amount ({sym})</span>
               <input
                 type="number"
                 step="0.01"

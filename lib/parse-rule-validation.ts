@@ -1,3 +1,5 @@
+import { isCurrencyCode, type CurrencyCode } from "./currencies";
+
 export type RuleInput = {
   name: string;
   senderPattern: string | null;
@@ -6,6 +8,7 @@ export type RuleInput = {
   merchantRegex: string;
   type: "in" | "out";
   defaultCategory: string;
+  currency: CurrencyCode;
   priority: number;
   active: boolean;
 };
@@ -60,6 +63,15 @@ export function validateRule(body: unknown): Result {
     return { ok: false, error: "Bad defaultCategory" };
   }
 
+  let currency: CurrencyCode;
+  if (b.currency === undefined) {
+    currency = "USD";
+  } else if (isCurrencyCode(b.currency)) {
+    currency = b.currency;
+  } else {
+    return { ok: false, error: "Bad currency" };
+  }
+
   const priority =
     b.priority === undefined
       ? 0
@@ -87,6 +99,7 @@ export function validateRule(body: unknown): Result {
       merchantRegex: b.merchantRegex,
       type: b.type,
       defaultCategory: b.defaultCategory.trim(),
+      currency,
       priority,
       active,
     },
