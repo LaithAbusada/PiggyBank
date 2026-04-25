@@ -99,8 +99,8 @@ export type DerivedStats = {
   inc: number;
   exp: number;
   catSegments: { label: string; value: number; color: string }[];
-  incSmooth: number[];
-  expSmooth: number[];
+  incSeries: number[];
+  expSeries: number[];
   monthSpent: number;
   daysElapsed: number;
   daysInMonth: number;
@@ -160,12 +160,7 @@ export function deriveStats(txns: Transaction[], rangeDays = 30): DerivedStats {
       else expSeries[idx] += Math.abs(t.amount);
     }
   });
-  const smoothed = (arr: number[], base: number) =>
-    arr.map((v, i) => v || base + (Math.sin(i * 0.8) + 1) * base * 0.4);
-  const incSmooth = smoothed(incSeries, 60);
-  const expSmooth = smoothed(expSeries, 35);
-
-  return { inc, exp, catSegments, incSmooth, expSmooth, monthSpent, daysElapsed, daysInMonth, spendByCat };
+  return { inc, exp, catSegments, incSeries, expSeries, monthSpent, daysElapsed, daysInMonth, spendByCat };
 }
 
 export function dayLabels(rangeDays = 30): string[] {

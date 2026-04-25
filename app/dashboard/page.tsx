@@ -280,8 +280,8 @@ export default function DashboardPage() {
                 </div>
               </div>
               <AreaChart
-                income={stats.incSmooth}
-                expense={stats.expSmooth}
+                income={stats.incSeries}
+                expense={stats.expSeries}
                 labels={labels}
                 mode={prefs.cashflowChart}
               />
