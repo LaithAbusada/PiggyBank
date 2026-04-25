@@ -67,6 +67,7 @@ model ParseRule {
   contentPattern  String?
   amountRegex     String
   merchantRegex   String
+  currencyRegex   String?
   type            String
   defaultCategory String
   currency        String   @default("USD")

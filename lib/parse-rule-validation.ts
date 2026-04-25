@@ -6,6 +6,7 @@ export type RuleInput = {
   contentPattern: string | null;
   amountRegex: string;
   merchantRegex: string;
+  currencyRegex: string | null;
   type: "in" | "out";
   defaultCategory: string;
   currency: CurrencyCode;
@@ -57,6 +58,12 @@ export function validateRule(body: unknown): Result {
   }
   if (!compiles(b.merchantRegex)) return { ok: false, error: "Invalid merchantRegex" };
 
+  const currencyRegex = readOptRegex(b.currencyRegex);
+  if (currencyRegex === undefined) return { ok: false, error: "Bad currencyRegex" };
+  if (currencyRegex !== null && !compiles(currencyRegex)) {
+    return { ok: false, error: "Invalid currencyRegex" };
+  }
+
   if (b.type !== "in" && b.type !== "out") return { ok: false, error: "Bad type" };
 
   if (typeof b.defaultCategory !== "string" || !b.defaultCategory.trim()) {
@@ -97,6 +104,7 @@ export function validateRule(body: unknown): Result {
       contentPattern,
       amountRegex: b.amountRegex,
       merchantRegex: b.merchantRegex,
+      currencyRegex,
       type: b.type,
       defaultCategory: b.defaultCategory.trim(),
       currency,

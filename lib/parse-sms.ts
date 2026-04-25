@@ -56,7 +56,14 @@ export async function parseSms(userId: string, raw: string): Promise<ParsedSms |
 
     if (rule.type !== "in" && rule.type !== "out") continue;
 
-    const rate = isCurrencyCode(rule.currency) ? CURRENCIES[rule.currency].rate : 1;
+    let useCurrency = isCurrencyCode(rule.currency) ? rule.currency : "USD";
+    if (rule.currencyRegex) {
+      const cre = safeRegex(rule.currencyRegex);
+      const cm = cre?.exec(raw);
+      const captured = cm?.[1]?.trim().toUpperCase();
+      if (captured && isCurrencyCode(captured)) useCurrency = captured;
+    }
+    const rate = CURRENCIES[useCurrency].rate;
     const amount = rate ? rawAmount / rate : rawAmount;
 
     return {

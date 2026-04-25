@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { IconClose } from "@/lib/icons";
 import { CATEGORIES_OPTIONS } from "@/lib/dashboard-data";
-import { CURRENCIES, CURRENCY_CODES, type CurrencyCode } from "@/lib/currencies";
+import { CURRENCIES, CURRENCY_CODES, isCurrencyCode, type CurrencyCode } from "@/lib/currencies";
 
 export type ParseRuleData = {
   id?: string;
@@ -12,6 +12,7 @@ export type ParseRuleData = {
   contentPattern: string | null;
   amountRegex: string;
   merchantRegex: string;
+  currencyRegex: string | null;
   type: "in" | "out";
   defaultCategory: string;
   currency: CurrencyCode;
@@ -33,6 +34,7 @@ const emptyRule: ParseRuleData = {
   contentPattern: null,
   amountRegex: "",
   merchantRegex: "",
+  currencyRegex: null,
   type: "out",
   defaultCategory: "Other",
   currency: "USD",
@@ -140,6 +142,17 @@ export default function ParseRuleModal({ open, onClose, onSave, initial, sampleR
   const contentOk = useMemo(() => tryTest(rule.contentPattern, testSms), [rule.contentPattern, testSms]);
   const amountRes = useMemo(() => tryExtract(rule.amountRegex, testSms), [rule.amountRegex, testSms]);
   const merchantRes = useMemo(() => tryExtract(rule.merchantRegex, testSms), [rule.merchantRegex, testSms]);
+  const currencyRes = useMemo(
+    () => (rule.currencyRegex ? tryExtract(rule.currencyRegex, testSms) : null),
+    [rule.currencyRegex, testSms]
+  );
+  const detectedCurrency: CurrencyCode = useMemo(() => {
+    if (currencyRes && currencyRes.ok) {
+      const up = currencyRes.value.trim().toUpperCase();
+      if (isCurrencyCode(up)) return up;
+    }
+    return rule.currency;
+  }, [currencyRes, rule.currency]);
   const overallMatch = !!testSms && senderOk.ok && contentOk.ok && amountRes.ok && merchantRes.ok;
 
   if (!open) return null;
@@ -290,6 +303,15 @@ export default function ParseRuleModal({ open, onClose, onSave, initial, sampleR
             />
           </Field>
 
+          <Field label="Currency regex (optional)" hint="If set and the captured code matches a known currency (USD, JOD, etc.), it overrides the dropdown below.">
+            <input
+              style={monoFieldStyle}
+              value={rule.currencyRegex ?? ""}
+              onChange={(e) => setRule({ ...rule, currencyRegex: e.target.value || null })}
+              placeholder="(USD|EUR|JOD|AED|GBP|SAR|EGP|ILS)"
+            />
+          </Field>
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="Type">
               <select
@@ -372,10 +394,13 @@ export default function ParseRuleModal({ open, onClose, onSave, initial, sampleR
               <div style={{ marginTop: 10, display: "grid", gap: 4 }}>
                 <TestRow label="Sender filter" res={senderOk} />
                 <TestRow label="Content filter" res={contentOk} />
-                <TestRow label={`Amount (${rule.currency})`} res={amountRes} />
-                {amountRes.ok && rule.currency !== "USD" && (() => {
+                <TestRow label={`Amount (${detectedCurrency})`} res={amountRes} />
+                {currencyRes && (
+                  <TestRow label="Currency (from regex)" res={currencyRes} />
+                )}
+                {amountRes.ok && detectedCurrency !== "USD" && (() => {
                   const raw = parseFloat(amountRes.value.replace(/,/g, ""));
-                  const usd = isFinite(raw) ? raw / CURRENCIES[rule.currency].rate : NaN;
+                  const usd = isFinite(raw) ? raw / CURRENCIES[detectedCurrency].rate : NaN;
                   return (
                     <TestRow
                       label="Stored as (USD)"
