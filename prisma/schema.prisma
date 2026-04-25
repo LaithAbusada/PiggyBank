@@ -12,10 +12,13 @@ model User {
   id           String        @id
   email        String?
   monthBudget  Float         @default(1500)
+  apiToken     String?       @unique
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   transactions Transaction[]
   recurring    Recurring[]
+  parseRules   ParseRule[]
+  pendingSms   PendingSms[]
 }
 
 model Transaction {
@@ -29,8 +32,10 @@ model Transaction {
   cat       String
   amount    Float
   date      DateTime
+  smsHash   String?
   createdAt DateTime @default(now())
 
+  @@unique([userId, smsHash])
   @@index([userId, date])
 }
 
@@ -51,4 +56,36 @@ model Recurring {
   createdAt  DateTime @default(now())
 
   @@index([userId, active])
+}
+
+model ParseRule {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  senderPattern   String?
+  contentPattern  String?
+  amountRegex     String
+  merchantRegex   String
+  type            String
+  defaultCategory String
+  priority        Int      @default(0)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, active, priority])
+}
+
+model PendingSms {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  raw        String
+  receivedAt DateTime
+  smsHash    String
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, smsHash])
+  @@index([userId, createdAt])
 }

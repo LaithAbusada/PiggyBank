@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Brand,
+  IconBolt,
   IconCalculator,
   IconCalendar,
   IconFolder,
@@ -23,6 +24,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { href: "/dashboard",                label: "Dashboard",    icon: IconHome },
+  { href: "/dashboard/automations",    label: "Automations",  icon: IconBolt },
   { href: "/dashboard/file-manager",   label: "File Manager", icon: IconFolder },
   { href: "/dashboard/calendar",       label: "Calendar",     icon: IconCalendar },
   { href: "/dashboard/invoicing",      label: "Invoicing",    icon: IconInvoice },
