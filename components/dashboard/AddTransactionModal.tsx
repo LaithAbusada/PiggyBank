@@ -10,23 +10,37 @@ import {
   IconPlus,
 } from "@/lib/icons";
 
+export type TransactionEditInitial = {
+  type: "in" | "out";
+  amount: number;
+  title: string;
+  merchant: string;
+  category: string;
+  date: string;
+  note: string;
+};
+
 type Props = {
   open: boolean;
   onClose: () => void;
   onAdd: (t: TransactionInput) => Promise<void> | void;
+  initial?: TransactionEditInitial;
+  mode?: "add" | "edit";
+  onDelete?: () => Promise<void> | void;
 };
 
-export default function AddTransactionModal({ open, onClose, onAdd }: Props) {
+export default function AddTransactionModal({ open, onClose, onAdd, initial, mode = "add", onDelete }: Props) {
   const { sym, rate } = useCurrency();
   const today = new Date().toISOString().slice(0, 10);
-  const [type, setType] = useState<"in" | "out">("out");
-  const [amount, setAmount] = useState("");
-  const [title, setTitle] = useState("");
-  const [merchant, setMerchant] = useState("");
-  const [category, setCategory] = useState("Restaurants");
-  const [date, setDate] = useState(today);
-  const [note, setNote] = useState("");
+  const [type, setType] = useState<"in" | "out">(initial?.type ?? "out");
+  const [amount, setAmount] = useState(initial ? String(initial.amount) : "");
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [merchant, setMerchant] = useState(initial?.merchant ?? "");
+  const [category, setCategory] = useState(initial?.category ?? "Restaurants");
+  const [date, setDate] = useState(initial?.date ?? today);
+  const [note, setNote] = useState(initial?.note ?? "");
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -115,9 +129,9 @@ export default function AddTransactionModal({ open, onClose, onAdd }: Props) {
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
           <div>
-            <div className="kicker">Log</div>
+            <div className="kicker">{mode === "edit" ? "Update" : "Log"}</div>
             <h3 className="display" style={{ fontSize: 24, fontWeight: 700, margin: "4px 0 0" }}>
-              Add transaction
+              {mode === "edit" ? "Edit transaction" : "Add transaction"}
             </h3>
           </div>
           <button
@@ -363,10 +377,31 @@ export default function AddTransactionModal({ open, onClose, onAdd }: Props) {
         </div>
 
         <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+          {mode === "edit" && onDelete && (
+            <button
+              type="button"
+              onClick={async () => {
+                if (deleting) return;
+                setDeleting(true);
+                try { await onDelete(); onClose(); } finally { setDeleting(false); }
+              }}
+              disabled={submitting || deleting}
+              className="btn btn--outline"
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                color: "var(--neg)",
+                borderColor: "var(--neg)",
+                opacity: deleting ? 0.6 : 1,
+              }}
+            >
+              {deleting ? "Deleting…" : "Delete"}
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
-            disabled={submitting}
+            disabled={submitting || deleting}
             className="btn btn--outline"
             style={{ flex: 1, justifyContent: "center", opacity: submitting ? 0.6 : 1 }}
           >
@@ -374,7 +409,7 @@ export default function AddTransactionModal({ open, onClose, onAdd }: Props) {
           </button>
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || deleting}
             className="btn btn--ink"
             style={{ flex: 2, justifyContent: "center", opacity: submitting ? 0.85 : 1 }}
             aria-busy={submitting}
@@ -383,6 +418,8 @@ export default function AddTransactionModal({ open, onClose, onAdd }: Props) {
               <>
                 <span className="pb-spin" /> Saving…
               </>
+            ) : mode === "edit" ? (
+              <>Save changes</>
             ) : (
               <>
                 <IconPlus size={16} /> Add transaction

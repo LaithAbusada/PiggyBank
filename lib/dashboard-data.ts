@@ -107,71 +107,85 @@ export type DerivedStats = {
   spendByCat: Record<string, number>;
 };
 
-export function deriveStats(txns: Transaction[], rangeDays = 30): DerivedStats {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const daysElapsed = now.getDate();
-  const days = Math.max(1, rangeDays);
+export type MonthRef = { year: number; month: number };
 
+export function currentMonth(): MonthRef {
+  const d = new Date();
+  return { year: d.getFullYear(), month: d.getMonth() };
+}
+
+export function shiftMonth({ year, month }: MonthRef, delta: number): MonthRef {
+  const d = new Date(year, month + delta, 1);
+  return { year: d.getFullYear(), month: d.getMonth() };
+}
+
+export function isSameMonth(a: MonthRef, b: MonthRef) {
+  return a.year === b.year && a.month === b.month;
+}
+
+export function isFutureMonth(a: MonthRef, ref: MonthRef = currentMonth()) {
+  return a.year > ref.year || (a.year === ref.year && a.month > ref.month);
+}
+
+export function monthLabel({ year, month }: MonthRef): string {
+  return new Date(year, month, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
+export function deriveStats(txns: Transaction[], target: MonthRef = currentMonth()): DerivedStats {
+  const { year, month } = target;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date();
+  const isCurrent = today.getFullYear() === year && today.getMonth() === month;
+  const daysElapsed = isCurrent
+    ? today.getDate()
+    : isFutureMonth(target, currentMonth())
+      ? 0
+      : daysInMonth;
+
+  const dateOf = (t: Transaction) => (t._dateISO ? new Date(t._dateISO) : null);
   const inMonth = (t: Transaction) => {
-    if (t._dateISO) {
-      const d = new Date(t._dateISO);
-      return d.getFullYear() === year && d.getMonth() === month;
-    }
-    return true;
+    const d = dateOf(t);
+    if (!d) return false;
+    return d.getFullYear() === year && d.getMonth() === month;
   };
   const monthTxns = txns.filter(inMonth);
-  const monthSpent = monthTxns.filter((t) => t.type === "out").reduce((s, t) => s + Math.abs(t.amount), 0);
 
-  const inc = txns.filter((t) => t.type === "in").reduce((s, t) => s + Math.abs(t.amount), 0);
-  const exp = txns.filter((t) => t.type === "out").reduce((s, t) => s + Math.abs(t.amount), 0);
+  const inc = monthTxns.filter((t) => t.type === "in").reduce((s, t) => s + Math.abs(t.amount), 0);
+  const exp = monthTxns.filter((t) => t.type === "out").reduce((s, t) => s + Math.abs(t.amount), 0);
+  const monthSpent = exp;
 
-  const byCat: Record<string, number> = {};
-  txns.filter((t) => t.type === "out").forEach((t) => {
-    byCat[t.cat] = (byCat[t.cat] || 0) + Math.abs(t.amount);
-  });
   const spendByCat: Record<string, number> = {};
   monthTxns.filter((t) => t.type === "out").forEach((t) => {
     spendByCat[t.cat] = (spendByCat[t.cat] || 0) + Math.abs(t.amount);
   });
-  const catSegments = Object.entries(byCat)
+  const catSegments = Object.entries(spendByCat)
     .sort((a, b) => b[1] - a[1])
     .map(([k, v]) => {
       const meta = CATEGORIES_OPTIONS.find((c) => c.key === k);
       return { label: k, value: v, color: meta ? meta.color : "oklch(0.60 0.02 280)" };
     });
 
-  const today = new Date();
-  const incSeries = Array(days).fill(0);
-  const expSeries = Array(days).fill(0);
-  txns.forEach((t) => {
-    let d: Date;
-    if (t._dateISO) d = new Date(t._dateISO);
-    else {
-      const parsed = Date.parse(t.when + ", " + today.getFullYear());
-      d = isFinite(parsed) ? new Date(parsed) : today;
-    }
-    const diff = Math.floor((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
-    if (diff >= 0 && diff < days) {
-      const idx = days - 1 - diff;
-      if (t.type === "in") incSeries[idx] += Math.abs(t.amount);
-      else expSeries[idx] += Math.abs(t.amount);
-    }
+  const incSeries = Array(daysInMonth).fill(0);
+  const expSeries = Array(daysInMonth).fill(0);
+  monthTxns.forEach((t) => {
+    const d = dateOf(t);
+    if (!d) return;
+    const idx = d.getDate() - 1;
+    if (idx < 0 || idx >= daysInMonth) return;
+    if (t.type === "in") incSeries[idx] += Math.abs(t.amount);
+    else expSeries[idx] += Math.abs(t.amount);
   });
   return { inc, exp, catSegments, incSeries, expSeries, monthSpent, daysElapsed, daysInMonth, spendByCat };
 }
 
-export function dayLabels(rangeDays = 30): string[] {
-  const out: string[] = [];
-  const today = new Date();
-  const span = Math.max(1, rangeDays);
+export function monthDayLabels(target: MonthRef = currentMonth()): string[] {
+  const { year, month } = target;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
   const ticks = 5;
+  const out: string[] = [];
   for (let i = 0; i < ticks; i++) {
-    const offset = Math.round(((ticks - 1 - i) * (span - 1)) / (ticks - 1));
-    const d = new Date(today);
-    d.setDate(d.getDate() - offset);
+    const day = Math.round((i * (daysInMonth - 1)) / (ticks - 1)) + 1;
+    const d = new Date(year, month, day);
     out.push(d.toLocaleDateString("en-US", { month: "short", day: "numeric" }));
   }
   return out;

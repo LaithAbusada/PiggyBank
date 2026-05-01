@@ -3,9 +3,7 @@
 import {
   useDashboardPrefs,
   WIDGET_META,
-  RANGE_LABELS,
   type CashflowChart,
-  type CashflowRange,
   type Density,
   type SpendingChart,
   type WidgetKey,
@@ -162,9 +160,6 @@ export function CustomizePanelContent() {
     { value: "donut", label: "Donut" },
     { value: "bar", label: "Bars" },
   ];
-  const rangeOptions: { value: CashflowRange; label: string }[] = (
-    Object.keys(RANGE_LABELS) as CashflowRange[]
-  ).map((k) => ({ value: k, label: RANGE_LABELS[k] }));
   const densityOptions: { value: Density; label: string }[] = [
     { value: "cozy", label: "Cozy" },
     { value: "compact", label: "Compact" },
@@ -189,14 +184,6 @@ export function CustomizePanelContent() {
           onChange={(v) => setPrefs({ cashflowChart: v })}
         />
       </Row>
-      <Row title="Date range" desc="Window used for the cashflow series.">
-        <SegButtons
-          value={prefs.cashflowRange}
-          options={rangeOptions}
-          onChange={(v) => setPrefs({ cashflowRange: v })}
-        />
-      </Row>
-
       <GroupLabel>Spending breakdown</GroupLabel>
       <Row title="Chart style" desc="Donut or ranked horizontal bars.">
         <SegButtons

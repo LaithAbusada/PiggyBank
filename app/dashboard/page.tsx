@@ -7,9 +7,15 @@ import { useCurrency } from "@/lib/currency";
 import {
   CAT_BUDGETS,
   USER,
-  dayLabels,
+  monthDayLabels,
   deriveStats,
   fromDbTransaction,
+  currentMonth,
+  shiftMonth,
+  isSameMonth,
+  isFutureMonth,
+  monthLabel,
+  type MonthRef,
   type Transaction,
   type TransactionInput,
 } from "@/lib/dashboard-data";
@@ -29,8 +35,9 @@ import AddFAB from "@/components/dashboard/AddFAB";
 import DashboardSkeleton from "@/components/dashboard/DashboardSkeleton";
 import InsightsCard from "@/components/dashboard/InsightsCard";
 import { computeInsights } from "@/lib/insights";
-import { RANGE_DAYS, RANGE_LABELS, useDashboardPrefs } from "@/lib/dashboard-prefs";
+import { useDashboardPrefs } from "@/lib/dashboard-prefs";
 import type { RecurringInput } from "@/components/dashboard/AddRecurringModal";
+import type { TransactionEditInitial } from "@/components/dashboard/AddTransactionModal";
 
 const AddTransactionModal = dynamic(
   () => import("@/components/dashboard/AddTransactionModal"),
@@ -48,7 +55,7 @@ const CustomizeDrawer = dynamic(
 const DEFAULT_BUDGET = 1500;
 
 export default function DashboardPage() {
-  const { fmt } = useCurrency();
+  const { fmt, rate } = useCurrency();
   const { user } = useUser();
   const { prefs } = useDashboardPrefs();
   const [modalOpen, setModalOpen] = useState(false);
@@ -59,6 +66,9 @@ export default function DashboardPage() {
   const [recurring, setRecurring] = useState<Recurring[]>([]);
   const [monthBudget, setMonthBudget] = useState(DEFAULT_BUDGET);
   const [loading, setLoading] = useState(true);
+  const [selectedMonth, setSelectedMonth] = useState<MonthRef>(() => currentMonth());
+  const [showAllTxns, setShowAllTxns] = useState(false);
+  const [editingTxn, setEditingTxn] = useState<Transaction | null>(null);
 
   const refetchTxns = async () => {
     const res = await fetch("/api/transactions");
@@ -119,6 +129,17 @@ export default function DashboardPage() {
     if (!res.ok) setTxns(prev);
   };
 
+  const updateTxn = async (id: string, input: TransactionInput) => {
+    const res = await fetch(`/api/transactions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) return;
+    const row = await res.json();
+    setTxns((prev) => prev.map((t) => (t.id === id ? fromDbTransaction(row) : t)));
+  };
+
   const addRecurring = async (input: RecurringInput) => {
     const res = await fetch("/api/recurring", {
       method: "POST",
@@ -146,13 +167,22 @@ export default function DashboardPage() {
     });
   };
 
-  const rangeDays = RANGE_DAYS[prefs.cashflowRange];
-  const stats = useMemo(() => deriveStats(txns, rangeDays), [txns, rangeDays]);
-  const labels = useMemo(() => dayLabels(rangeDays), [rangeDays]);
+  const stats = useMemo(() => deriveStats(txns, selectedMonth), [txns, selectedMonth]);
+  const labels = useMemo(() => monthDayLabels(selectedMonth), [selectedMonth]);
+  const pointLabels = useMemo(() => {
+    const out: string[] = [];
+    for (let i = 0; i < stats.daysInMonth; i++) {
+      const d = new Date(selectedMonth.year, selectedMonth.month, i + 1);
+      out.push(d.toLocaleDateString("en-US", { month: "short", day: "numeric" }));
+    }
+    return out;
+  }, [selectedMonth, stats.daysInMonth]);
   const insights = useMemo(
-    () => computeInsights({ txns, monthBudget, recurring, fmt }),
-    [txns, monthBudget, recurring, fmt],
+    () => computeInsights({ txns, monthBudget, recurring, fmt, target: selectedMonth }),
+    [txns, monthBudget, recurring, fmt, selectedMonth],
   );
+  const isCurrentMonth = isSameMonth(selectedMonth, currentMonth());
+  const canGoForward = !isCurrentMonth;
   const { visible } = prefs;
   const anyRailVisible =
     visible.insights ||
@@ -163,11 +193,31 @@ export default function DashboardPage() {
     visible.streak ||
     visible.catBudgets ||
     visible.goals;
-  const filtered = txns.filter((t) =>
+  const monthTxns = useMemo(
+    () => txns.filter((t) => {
+      if (!t._dateISO) return false;
+      const d = new Date(t._dateISO);
+      return d.getFullYear() === selectedMonth.year && d.getMonth() === selectedMonth.month;
+    }),
+    [txns, selectedMonth],
+  );
+  const filtered = monthTxns.filter((t) =>
     filter === "All" ? true : filter === "Income" ? t.type === "in" : t.type === "out"
   );
   const net = stats.inc - stats.exp;
   const greetingName = user?.firstName ?? USER.first;
+
+  const editInitial: TransactionEditInitial | undefined = editingTxn
+    ? {
+        type: editingTxn.type,
+        amount: Math.abs(editingTxn.amount) * rate,
+        title: editingTxn.title,
+        merchant: editingTxn.sub,
+        category: editingTxn.cat,
+        date: editingTxn._dateISO ?? new Date().toISOString().slice(0, 10),
+        note: editingTxn.note ?? "",
+      }
+    : undefined;
 
   if (loading) {
     return <DashboardSkeleton />;
@@ -194,10 +244,105 @@ export default function DashboardPage() {
             ) : (
               <span style={{ color: "var(--neg)" }}>-{fmt(Math.abs(net))}</span>
             )}{" "}
-            across {txns.length} transactions.
+            across {monthTxns.length} {isCurrentMonth ? "transactions this month" : `transactions in ${monthLabel(selectedMonth)}`}.
           </h1>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <div
+            role="group"
+            aria-label="Month selector"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              padding: 4,
+              borderRadius: 999,
+              border: "1px solid var(--line)",
+              background: "var(--surface-2)",
+            }}
+          >
+            <button
+              type="button"
+              aria-label="Previous month"
+              title="Previous month"
+              onClick={() => {
+                setSelectedMonth((m) => shiftMonth(m, -1));
+                setShowAllTxns(false);
+              }}
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 999,
+                border: "none",
+                background: "transparent",
+                color: "var(--ink-2)",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              <IconArrowRight size={14} style={{ transform: "rotate(180deg)" }} />
+            </button>
+            <span
+              className="num"
+              style={{ fontSize: 13, fontWeight: 600, padding: "0 8px", minWidth: 110, textAlign: "center" }}
+            >
+              {monthLabel(selectedMonth)}
+            </span>
+            <button
+              type="button"
+              aria-label="Next month"
+              title={canGoForward ? "Next month" : "Already at current month"}
+              disabled={!canGoForward}
+              onClick={() => {
+                setSelectedMonth((m) => {
+                  const next = shiftMonth(m, 1);
+                  return isFutureMonth(next) ? m : next;
+                });
+                setShowAllTxns(false);
+              }}
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 999,
+                border: "none",
+                background: "transparent",
+                color: canGoForward ? "var(--ink-2)" : "var(--ink-3)",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: canGoForward ? "pointer" : "not-allowed",
+                opacity: canGoForward ? 1 : 0.45,
+                fontFamily: "inherit",
+              }}
+            >
+              <IconArrowRight size={14} />
+            </button>
+            {!isCurrentMonth && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedMonth(currentMonth());
+                  setShowAllTxns(false);
+                }}
+                style={{
+                  fontSize: 11,
+                  padding: "4px 10px",
+                  borderRadius: 999,
+                  border: "none",
+                  background: "var(--ink)",
+                  color: "var(--bg)",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                Today
+              </button>
+            )}
+          </div>
           <button
             className="btn btn--outline btn--sm"
             onClick={() => setCustomizeOpen(true)}
@@ -231,7 +376,7 @@ export default function DashboardPage() {
               >
                 <div>
                   <h3 className="display" style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>
-                    Cashflow · {RANGE_LABELS[prefs.cashflowRange].toLowerCase()}
+                    Cashflow · {monthLabel(selectedMonth)}
                   </h3>
                   <div style={{ display: "flex", gap: 16, marginTop: 6, fontSize: 12 }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -283,6 +428,7 @@ export default function DashboardPage() {
                 income={stats.incSeries}
                 expense={stats.expSeries}
                 labels={labels}
+                pointLabels={pointLabels}
                 mode={prefs.cashflowChart}
               />
             </div>
@@ -305,7 +451,7 @@ export default function DashboardPage() {
               </div>
               {stats.catSegments.length === 0 ? (
                 <div style={{ padding: "20px 0", color: "var(--ink-3)", fontSize: 14 }}>
-                  No expenses yet. Add one with the + button.
+                  No expenses {isCurrentMonth ? "yet" : `in ${monthLabel(selectedMonth)}`}. Add one with the + button.
                 </div>
               ) : prefs.spendingChart === "donut" ? (
                 <DonutChart
@@ -331,9 +477,14 @@ export default function DashboardPage() {
                   gap: 8,
                 }}
               >
-                <h3 className="display" style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>
-                  All Transactions
-                </h3>
+                <div>
+                  <h3 className="display" style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>
+                    Transactions · {monthLabel(selectedMonth)}
+                  </h3>
+                  <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>
+                    Click a row to edit · category, amount, or date
+                  </div>
+                </div>
                 <div style={{ display: "flex", gap: 6 }}>
                   {(["All", "Income", "Expense"] as const).map((t) => (
                     <button
@@ -353,17 +504,29 @@ export default function DashboardPage() {
               <div>
                 {filtered.length === 0 ? (
                   <div style={{ padding: "20px 0", color: "var(--ink-3)", fontSize: 14 }}>
-                    Nothing here yet.
+                    Nothing in {monthLabel(selectedMonth)} yet.
                   </div>
                 ) : (
-                  filtered.slice(0, 8).map((t) => (
-                    <TransactionRow key={t.id} t={t} onRemove={removeTxn} />
+                  (showAllTxns ? filtered : filtered.slice(0, 8)).map((t) => (
+                    <TransactionRow
+                      key={t.id}
+                      t={t}
+                      onRemove={removeTxn}
+                      onEdit={setEditingTxn}
+                    />
                   ))
                 )}
               </div>
               {filtered.length > 8 && (
-                <button className="btn btn--ghost btn--sm" style={{ marginTop: 6 }}>
-                  View all {filtered.length} transactions <IconArrowRight size={14} />
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  style={{ marginTop: 6 }}
+                  onClick={() => setShowAllTxns((v) => !v)}
+                >
+                  {showAllTxns
+                    ? <>Show fewer</>
+                    : <>View all {filtered.length} transactions <IconArrowRight size={14} /></>}
                 </button>
               )}
             </div>
@@ -421,6 +584,7 @@ export default function DashboardPage() {
                   monthBudget={monthBudget}
                   daysElapsed={stats.daysElapsed}
                   daysInMonth={stats.daysInMonth}
+                  target={selectedMonth}
                 />
               </div>
             )}
@@ -480,6 +644,20 @@ export default function DashboardPage() {
           open={modalOpen}
           onClose={() => setModalOpen(false)}
           onAdd={addTxn}
+        />
+      )}
+      {editingTxn && editInitial && (
+        <AddTransactionModal
+          open={true}
+          mode="edit"
+          initial={editInitial}
+          onClose={() => setEditingTxn(null)}
+          onAdd={async (input) => {
+            await updateTxn(editingTxn.id, input);
+          }}
+          onDelete={async () => {
+            await removeTxn(editingTxn.id);
+          }}
         />
       )}
       {recurringModalOpen && (

@@ -1,12 +1,14 @@
 "use client";
 
 import { useCurrency } from "@/lib/currency";
+import { currentMonth, isSameMonth, type MonthRef } from "@/lib/dashboard-data";
 
 type Props = {
   monthSpent: number;
   monthBudget: number;
   daysElapsed: number;
   daysInMonth: number;
+  target?: MonthRef;
 };
 
 export default function MonthAtAGlance({
@@ -14,21 +16,24 @@ export default function MonthAtAGlance({
   monthBudget,
   daysElapsed,
   daysInMonth,
+  target,
 }: Props) {
   const { fmt } = useCurrency();
+  const ref = target ?? currentMonth();
+  const isCurrent = isSameMonth(ref, currentMonth());
   const daysLeft = Math.max(0, daysInMonth - daysElapsed);
   const avgDaily = daysElapsed > 0 ? monthSpent / daysElapsed : 0;
-  const projected = avgDaily * daysInMonth;
+  const projected = isCurrent ? avgDaily * daysInMonth : monthSpent;
   const pace = monthBudget > 0 ? projected / monthBudget : 0;
   const onTrack = pace <= 1;
   const pct = monthBudget > 0 ? Math.min(100, (monthSpent / monthBudget) * 100) : 0;
-  const monthName = new Date().toLocaleDateString("en-US", { month: "long" });
+  const monthName = new Date(ref.year, ref.month, 1).toLocaleDateString("en-US", { month: "long" });
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
         <div>
-          <div className="kicker">{monthName} so far</div>
+          <div className="kicker">{monthName}{isCurrent ? " so far" : " · final"}</div>
           <div className="num" style={{ fontSize: 28, fontWeight: 700, marginTop: 2 }}>
             {fmt(monthSpent, { short: true })}
           </div>
@@ -79,9 +84,9 @@ export default function MonthAtAGlance({
         }}
       >
         <div style={{ fontWeight: 600, marginBottom: 2 }}>
-          {onTrack ? "✓ On pace" : "⚠ Over pace"}
+          {isCurrent ? (onTrack ? "✓ On pace" : "⚠ Over pace") : (onTrack ? "✓ Within budget" : "⚠ Over budget")}
         </div>
-        Projected this month:{" "}
+        {isCurrent ? "Projected this month: " : "Total this month: "}
         <span className="num" style={{ fontWeight: 700 }}>
           {fmt(projected, { short: true })}
         </span>

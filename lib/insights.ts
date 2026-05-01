@@ -1,4 +1,4 @@
-import { CAT_BUDGETS, type Transaction } from "./dashboard-data";
+import { CAT_BUDGETS, currentMonth, isSameMonth, type MonthRef, type Transaction } from "./dashboard-data";
 
 export type InsightTone = "good" | "warn" | "neutral";
 export type InsightIcon = "trendUp" | "trendDown" | "sparkle" | "bolt" | "wallet" | "category";
@@ -20,30 +20,32 @@ type Input = {
   monthBudget: number;
   recurring: RecurringLite[];
   fmt: (n: number, opts?: { short?: boolean }) => string;
+  target?: MonthRef;
 };
 
 function dateOf(t: Transaction): Date {
   return t._dateISO ? new Date(t._dateISO) : new Date();
 }
 
-function isSameMonth(d: Date, y: number, m: number) {
-  return d.getFullYear() === y && d.getMonth() === m;
+function dateInMonth(d: Date, ref: MonthRef) {
+  return d.getFullYear() === ref.year && d.getMonth() === ref.month;
 }
 
-export function computeInsights({ txns, monthBudget, recurring, fmt }: Input): Insight[] {
+export function computeInsights({ txns, monthBudget, recurring, fmt, target }: Input): Insight[] {
   const out: Insight[] = [];
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
+  const ref = target ?? currentMonth();
+  const today = new Date();
+  const y = ref.year;
+  const m = ref.month;
   const daysInMonth = new Date(y, m + 1, 0).getDate();
-  const daysElapsed = Math.max(1, now.getDate());
+  const isCurrent = isSameMonth(ref, currentMonth());
+  const daysElapsed = isCurrent ? Math.max(1, today.getDate()) : daysInMonth;
   const prev = new Date(y, m - 1, 1);
-  const py = prev.getFullYear();
-  const pm = prev.getMonth();
+  const prevRef: MonthRef = { year: prev.getFullYear(), month: prev.getMonth() };
 
-  const thisMonthOut = txns.filter((t) => t.type === "out" && isSameMonth(dateOf(t), y, m));
-  const thisMonthIn = txns.filter((t) => t.type === "in" && isSameMonth(dateOf(t), y, m));
-  const lastMonthOut = txns.filter((t) => t.type === "out" && isSameMonth(dateOf(t), py, pm));
+  const thisMonthOut = txns.filter((t) => t.type === "out" && dateInMonth(dateOf(t), ref));
+  const thisMonthIn = txns.filter((t) => t.type === "in" && dateInMonth(dateOf(t), ref));
+  const lastMonthOut = txns.filter((t) => t.type === "out" && dateInMonth(dateOf(t), prevRef));
 
   const spent = thisMonthOut.reduce((s, t) => s + Math.abs(t.amount), 0);
   const income = thisMonthIn.reduce((s, t) => s + Math.abs(t.amount), 0);

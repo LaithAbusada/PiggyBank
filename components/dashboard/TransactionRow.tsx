@@ -8,9 +8,10 @@ import type { Transaction } from "@/lib/dashboard-data";
 type Props = {
   t: Transaction;
   onRemove?: (id: string) => Promise<void> | void;
+  onEdit?: (t: Transaction) => void;
 };
 
-export default function TransactionRow({ t, onRemove }: Props) {
+export default function TransactionRow({ t, onRemove, onEdit }: Props) {
   const { fmt } = useCurrency();
   const [hover, setHover] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -28,6 +29,7 @@ export default function TransactionRow({ t, onRemove }: Props) {
 
   return (
     <div
+      onClick={() => onEdit?.(t)}
       onMouseEnter={(e) => {
         setHover(true);
         e.currentTarget.style.background = "var(--surface-2)";
@@ -43,7 +45,7 @@ export default function TransactionRow({ t, onRemove }: Props) {
         padding: "12px 10px",
         borderRadius: 14,
         transition: "background .15s ease",
-        cursor: "pointer",
+        cursor: onEdit ? "pointer" : "default",
         opacity: removing ? 0.5 : 1,
       }}
     >
