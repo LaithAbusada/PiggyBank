@@ -25,10 +25,18 @@ function safeRegex(pattern: string): RegExp | null {
 }
 
 export async function parseSms(userId: string, raw: string): Promise<ParsedSms | null> {
-  const rules = await prisma.parseRule.findMany({
-    where: { userId, active: true },
-    orderBy: { priority: "desc" },
-  });
+  const [rules, aliases] = await Promise.all([
+    prisma.parseRule.findMany({
+      where: { userId, active: true },
+      orderBy: { priority: "desc" },
+    }),
+    prisma.categoryAlias.findMany({
+      where: { userId, active: true },
+      orderBy: { priority: "desc" },
+    }),
+  ]);
+
+  const rawLower = raw.toLowerCase();
 
   for (const rule of rules) {
     if (rule.senderPattern) {
@@ -66,11 +74,18 @@ export async function parseSms(userId: string, raw: string): Promise<ParsedSms |
     const rate = CURRENCIES[useCurrency].rate;
     const amount = rate ? rawAmount / rate : rawAmount;
 
+    const merchantLower = merchant.toLowerCase();
+    const matchedAlias = aliases.find((a) => {
+      const kw = a.keyword.trim().toLowerCase();
+      if (!kw) return false;
+      return merchantLower.includes(kw) || rawLower.includes(kw);
+    });
+
     return {
       type: rule.type as "in" | "out",
       amount,
       merchant,
-      category: rule.defaultCategory,
+      category: matchedAlias?.category ?? rule.defaultCategory,
       ruleId: rule.id,
     };
   }

@@ -9,16 +9,17 @@ datasource db {
 }
 
 model User {
-  id           String        @id
-  email        String?
-  monthBudget  Float         @default(1500)
-  apiToken     String?       @unique
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  transactions Transaction[]
-  recurring    Recurring[]
-  parseRules   ParseRule[]
-  pendingSms   PendingSms[]
+  id              String           @id
+  email           String?
+  monthBudget     Float            @default(1500)
+  apiToken        String?          @unique
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  transactions    Transaction[]
+  recurring       Recurring[]
+  parseRules      ParseRule[]
+  pendingSms      PendingSms[]
+  categoryAliases CategoryAlias[]
 }
 
 model Transaction {
@@ -90,4 +91,18 @@ model PendingSms {
 
   @@unique([userId, smsHash])
   @@index([userId, createdAt])
+}
+
+model CategoryAlias {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  keyword   String
+  category  String
+  priority  Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, active, priority])
 }

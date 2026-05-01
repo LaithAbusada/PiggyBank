@@ -36,6 +36,12 @@ export async function materializeRecurring(userId: string, now: Date = new Date(
     let safety = 0;
 
     while (ymCompare(cursor, currentYm) <= 0 && safety < MAX_CATCHUP_MONTHS) {
+      if (cursor === currentYm) {
+        const { y, m } = parseYm(cursor);
+        const daysInMonth = new Date(y, m + 1, 0).getDate();
+        const dayThisMonth = Math.min(Math.max(1, r.dayOfMonth), daysInMonth);
+        if (now.getDate() < dayThisMonth) break;
+      }
       toCreate.push({ ym: cursor });
       cursor = nextYm(cursor);
       safety++;
