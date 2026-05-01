@@ -335,8 +335,8 @@ export default function AutomationsPage() {
                 display: "inline-flex",
               }}
             >
-              {pageUrl ? (
-                <QRCodeSVG value={pageUrl} size={160} />
+              {(shortcutUrl || pageUrl) ? (
+                <QRCodeSVG value={shortcutUrl || pageUrl} size={160} />
               ) : (
                 <div style={{ width: 160, height: 160 }} />
               )}
@@ -349,7 +349,9 @@ export default function AutomationsPage() {
                 maxWidth: 180,
               }}
             >
-              Scan with your iPhone camera to continue setup on your phone.
+              {shortcutUrl
+                ? "Scan with your iPhone camera to install the Shortcut directly. Copy your token first."
+                : "Scan with your iPhone camera to continue setup on your phone."}
             </div>
           </div>
         </div>
