@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { requireUser } from "@/lib/auth-user";
 import { prisma } from "@/lib/prisma";
 import { AI_MODEL, aiErrorResponse, aiNotConfigured, firstText, getAnthropic } from "@/lib/ai";
+import { CURRENCIES, isCurrencyCode } from "@/lib/currencies";
 
 export const maxDuration = 60;
 
@@ -82,6 +83,19 @@ export async function POST(req: Request) {
   }
   const offMs = tzOffsetMin * 60000;
 
+  // Optional display currency — amounts are stored in USD; the analysis is
+  // written in whatever currency the user is viewing the dashboard in.
+  const rawCurrency =
+    body && typeof body === "object" ? (body as Record<string, unknown>).currency : undefined;
+  let currency: keyof typeof CURRENCIES = "USD";
+  if (rawCurrency !== undefined) {
+    if (typeof rawCurrency !== "string" || !isCurrencyCode(rawCurrency)) {
+      return NextResponse.json({ error: "currency must be a supported code" }, { status: 400 });
+    }
+    currency = rawCurrency;
+  }
+  const fxRate = CURRENCIES[currency].rate;
+
   const anthropic = getAnthropic();
   if (!anthropic) return aiNotConfigured();
 
@@ -91,7 +105,7 @@ export async function POST(req: Request) {
   const targetStart = new Date(Date.UTC(year, monthIdx, 1) - offMs);
   const nextStart = new Date(Date.UTC(year, monthIdx + 1, 1) - offMs);
 
-  const [txns, recurring] = await Promise.all([
+  const [txnsUsd, recurring] = await Promise.all([
     prisma.transaction.findMany({
       where: { userId: user.id, date: { gte: prevStart, lt: nextStart } },
       select: { type: true, title: true, cat: true, amount: true, date: true },
@@ -102,6 +116,9 @@ export async function POST(req: Request) {
       select: { title: true, type: true, amount: true, dayOfMonth: true },
     }),
   ]);
+
+  // Everything downstream (summary + prompt) works in the display currency.
+  const txns = txnsUsd.map((t) => ({ ...t, amount: t.amount * fxRate }));
 
   const targetTxns = txns.filter((t) => t.date >= targetStart);
   const prevTxns = txns.filter((t) => t.date < targetStart);
@@ -139,7 +156,7 @@ export async function POST(req: Request) {
   const catBudgets: Record<string, number> = {};
   if (rawCatBudgets && typeof rawCatBudgets === "object" && !Array.isArray(rawCatBudgets)) {
     for (const [k, v] of Object.entries(rawCatBudgets as Record<string, unknown>)) {
-      if (typeof v === "number" && isFinite(v) && v > 0) catBudgets[k] = v;
+      if (typeof v === "number" && isFinite(v) && v > 0) catBudgets[k] = round2(v * fxRate);
     }
   }
 
@@ -169,18 +186,19 @@ export async function POST(req: Request) {
     isPartial,
     daysElapsed,
     daysInMonth,
-    monthBudget: user.monthBudget,
+    monthBudget: round2(user.monthBudget * fxRate),
     catBudgets,
     recurring: recurring.map((r) => ({
       title: r.title,
       type: r.type,
-      amount: round2(Math.abs(r.amount)),
+      amount: round2(Math.abs(r.amount) * fxRate),
       dayOfMonth: r.dayOfMonth,
     })),
   };
 
+  const cur = CURRENCIES[currency];
   const prompt = [
-    "You are a personal-finance analyst for the PiggyBank app. Below is a JSON summary of one user's finances for a target month and the month before it. All amounts are in USD.",
+    `You are a personal-finance analyst for the PiggyBank app. Below is a JSON summary of one user's finances for a target month and the month before it. All amounts are in ${cur.name} (${currency}). Whenever you cite an amount, format it with the currency symbol "${cur.symbol}" before the number (e.g. ${cur.symbol}125.50).${currency === "USD" ? "" : ` The amounts are NOT US dollars — never write "$" or "USD".`}`,
     "",
     'Analyze this user\'s month, compare it to the previous month, call out what is going well (tone "good") and what is concerning (tone "bad"), reference concrete numbers and categories, and give practical suggestions. Be specific to the data, never generic. Produce 3-6 highlights, 2-4 suggestions, and an overview of 2-3 sentences.',
     "",

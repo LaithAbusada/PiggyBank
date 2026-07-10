@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useUser } from "@clerk/nextjs";
+import { useCurrency } from "@/lib/currency";
 import { monthLabel, type MonthRef } from "@/lib/dashboard-data";
 import { IconSparkle } from "@/lib/icons";
 
@@ -56,11 +57,13 @@ const Spinner = ({ size = 16 }: { size?: number }) => (
 
 export default function AiInsightsCard({ month, statsHash }: Props) {
   const { user } = useUser();
+  const { code } = useCurrency();
   const userId = user?.id ?? null;
   const monthKey = `${month.year}-${String(month.month + 1).padStart(2, "0")}`;
-  // Cache is user-scoped; until Clerk resolves the user, skip reading/writing it.
-  const cacheKey = userId ? `pb_ai_insights_${userId}_${monthKey}` : null;
-  const requestKey = `${userId ?? "?"}:${monthKey}`;
+  // Cache is user- and currency-scoped (the analysis text embeds amounts in the
+  // display currency); until Clerk resolves the user, skip reading/writing it.
+  const cacheKey = userId ? `pb_ai_insights_${userId}_${monthKey}_${code}` : null;
+  const requestKey = `${userId ?? "?"}:${monthKey}:${code}`;
 
   const [result, setResult] = useState<AiInsightsResult | null>(null);
   const [cachedHash, setCachedHash] = useState<string | null>(null);
@@ -101,7 +104,11 @@ export default function AiInsightsCard({ month, statsHash }: Props) {
       const res = await fetch("/api/ai/insights", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ month: monthKey, tzOffsetMin: -new Date().getTimezoneOffset() }),
+        body: JSON.stringify({
+          month: monthKey,
+          tzOffsetMin: -new Date().getTimezoneOffset(),
+          currency: code,
+        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
