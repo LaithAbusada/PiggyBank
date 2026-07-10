@@ -265,13 +265,55 @@ export default function AiInsightsCard({ month, statsHash }: Props) {
           )}
 
           {result.suggestions.length > 0 && (
-            <ul style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "var(--ink-3)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  fontWeight: 600,
+                  marginTop: 2,
+                }}
+              >
+                Suggestions
+              </div>
               {result.suggestions.map((s, i) => (
-                <li key={i} style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
-                  {s}
-                </li>
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    alignItems: "flex-start",
+                    padding: "10px 12px",
+                    borderRadius: 14,
+                    background: "var(--surface-2)",
+                    border: "1px solid var(--line)",
+                  }}
+                >
+                  <span
+                    className="num"
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: "50%",
+                      background: "var(--accent-soft)",
+                      color: "var(--accent-ink)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      flexShrink: 0,
+                      marginTop: 1,
+                    }}
+                  >
+                    {i + 1}
+                  </span>
+                  <span style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.55 }}>{s}</span>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
 
           <div style={{ fontSize: 11, color: "var(--ink-3)" }}>
