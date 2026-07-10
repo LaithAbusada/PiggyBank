@@ -1,20 +1,20 @@
 "use client";
 
-import type { Transaction } from "@/lib/dashboard-data";
+import { localDateISO, type Transaction } from "@/lib/dashboard-data";
 
 export default function StreakCard({ txns }: { txns: Transaction[] }) {
   const days = 14;
   const today = new Date();
   const set = new Set<string>();
   txns.forEach((t) => {
-    const d = t._dateISO || new Date().toISOString().slice(0, 10);
+    const d = t._dateISO || localDateISO(new Date());
     set.add(d);
   });
   const dots: { key: string; logged: boolean }[] = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
+    const key = localDateISO(d);
     dots.push({ key, logged: set.has(key) });
   }
   let streak = 0;

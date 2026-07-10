@@ -25,15 +25,8 @@ const Svg = ({ size = 20, stroke = 1.7, fill, style, children, ...rest }: IconPr
 );
 
 export const IconHome = (p: IconProps) => <Svg {...p}><path d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1h-5v-7h-6v7H4a1 1 0 01-1-1z"/></Svg>;
-export const IconFolder = (p: IconProps) => <Svg {...p}><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></Svg>;
 export const IconCalendar = (p: IconProps) => <Svg {...p}><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></Svg>;
-export const IconInvoice = (p: IconProps) => <Svg {...p}><path d="M6 3h9l3 3v15H6z"/><path d="M9 10h6M9 14h6M9 18h4"/></Svg>;
-export const IconCalculator = (p: IconProps) => <Svg {...p}><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h.01M12 19h.01M16 19h.01"/></Svg>;
-export const IconLifeBuoy = (p: IconProps) => <Svg {...p}><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M4.9 4.9l4.3 4.3M14.8 14.8l4.3 4.3M4.9 19.1l4.3-4.3M14.8 9.2l4.3-4.3"/></Svg>;
 export const IconUser = (p: IconProps) => <Svg {...p}><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></Svg>;
-export const IconSearch = (p: IconProps) => <Svg {...p}><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></Svg>;
-export const IconBell = (p: IconProps) => <Svg {...p}><path d="M6 8a6 6 0 0112 0c0 7 3 7 3 9H3c0-2 3-2 3-9zM10 21a2 2 0 004 0"/></Svg>;
-export const IconMessage = (p: IconProps) => <Svg {...p}><path d="M21 11.5a8.4 8.4 0 01-8.5 8.5 8.5 8.5 0 01-4-1L3 21l2-5.5A8.5 8.5 0 013 11.5 8.4 8.4 0 0111.5 3 8.4 8.4 0 0121 11.5z"/></Svg>;
 export const IconMenu = (p: IconProps) => <Svg {...p}><path d="M4 6h16M4 12h16M4 18h16"/></Svg>;
 export const IconClose = (p: IconProps) => <Svg {...p}><path d="M6 6l12 12M18 6L6 18"/></Svg>;
 export const IconArrowUp = (p: IconProps) => <Svg {...p}><path d="M12 20V4M5 11l7-7 7 7"/></Svg>;

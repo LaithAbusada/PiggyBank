@@ -9,8 +9,11 @@ A personal finance tracker for logging transactions, managing recurring expenses
 ## Features
 
 - **Transactions** — log one-off income and expenses with categories, notes, and dates
-- **Recurring** — schedule repeating items by day-of-month; auto-rolls forward each month
-- **Dashboard** — budget overview with calculator, calendar, file manager, invoicing, and settings
+- **Recurring** — schedule repeating items by day-of-month; auto-rolls forward each month, pausable per item
+- **SMS ingestion** — forward bank SMS via an iOS Shortcut; regex parse rules turn them into transactions, with a pending queue for review
+- **AI regex assistant** — Claude generates parse rules from a sample SMS (requires `ANTHROPIC_API_KEY`)
+- **AI insights** — Claude analyzes your month on the dashboard: what's going well, what isn't, and what to do about it
+- **Analytics dashboard** — cashflow, category donut, 6-month trends, budget pace, weekday pattern, top merchants, streaks, and per-category budget caps
 - **Auth** — Clerk-backed sign-in / sign-up with protected routes via middleware
 - **Multi-currency** — pick your preferred currency from the settings
 
@@ -42,6 +45,8 @@ DATABASE_URL="postgresql://..."
 DIRECT_URL="postgresql://..."
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_..."
 CLERK_SECRET_KEY="sk_..."
+# Optional — enables the AI regex assistant and AI insights
+ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
 Push the schema and start dev:

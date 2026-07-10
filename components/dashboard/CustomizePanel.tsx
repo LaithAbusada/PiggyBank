@@ -10,17 +10,9 @@ import {
 } from "@/lib/dashboard-prefs";
 import { IconClose } from "@/lib/icons";
 
-const MAIN_WIDGETS: WidgetKey[] = ["cashflow", "spending", "transactions"];
-const RAIL_WIDGETS: WidgetKey[] = [
-  "insights",
-  "budgetJar",
-  "quickLog",
-  "recurring",
-  "monthGlance",
-  "streak",
-  "catBudgets",
-  "goals",
-];
+const ALL_WIDGETS = Object.keys(WIDGET_META) as WidgetKey[];
+const MAIN_WIDGETS: WidgetKey[] = ALL_WIDGETS.filter((k) => !WIDGET_META[k].rail);
+const RAIL_WIDGETS: WidgetKey[] = ALL_WIDGETS.filter((k) => WIDGET_META[k].rail);
 
 function Row({
   title,

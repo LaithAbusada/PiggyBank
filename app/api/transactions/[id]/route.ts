@@ -25,7 +25,8 @@ export async function PATCH(
   if (!user) return new NextResponse("Unauthorized", { status: 401 });
 
   const { id } = await params;
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") return new NextResponse("Bad body", { status: 400 });
   const data: Record<string, unknown> = {};
 
   if (typeof body?.type === "string" && (body.type === "in" || body.type === "out")) data.type = body.type;
@@ -41,6 +42,23 @@ export async function PATCH(
   }
 
   if (Object.keys(data).length === 0) return new NextResponse("No fields", { status: 400 });
+
+  // Keep the sign convention canonical (in = +abs, out = -abs) whenever type
+  // or amount changes; resolve whichever half is missing from the existing row.
+  if (data.type !== undefined || data.amount !== undefined) {
+    let effectiveType = data.type as string | undefined;
+    let baseAmount = data.amount as number | undefined;
+    if (effectiveType === undefined || baseAmount === undefined) {
+      const existing = await prisma.transaction.findFirst({
+        where: { id, userId: user.id },
+        select: { type: true, amount: true },
+      });
+      if (!existing) return new NextResponse("Not found", { status: 404 });
+      if (effectiveType === undefined) effectiveType = existing.type;
+      if (baseAmount === undefined) baseAmount = existing.amount;
+    }
+    data.amount = effectiveType === "in" ? Math.abs(baseAmount) : -Math.abs(baseAmount);
+  }
 
   const result = await prisma.transaction.updateMany({
     where: { id, userId: user.id },

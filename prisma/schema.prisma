@@ -12,6 +12,7 @@ model User {
   id              String           @id
   email           String?
   monthBudget     Float            @default(1500)
+  catBudgets      Json             @default("{}")
   apiToken        String?          @unique
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt

@@ -5,8 +5,6 @@ import dynamic from "next/dynamic";
 import { useUser } from "@clerk/nextjs";
 import { useCurrency } from "@/lib/currency";
 import {
-  CAT_BUDGETS,
-  USER,
   monthDayLabels,
   deriveStats,
   fromDbTransaction,
@@ -14,6 +12,8 @@ import {
   shiftMonth,
   isSameMonth,
   isFutureMonth,
+  isoToParts,
+  localDateISO,
   monthLabel,
   type MonthRef,
   type Transaction,
@@ -29,7 +29,11 @@ import QuickAdd from "@/components/dashboard/QuickAdd";
 import MonthAtAGlance from "@/components/dashboard/MonthAtAGlance";
 import StreakCard from "@/components/dashboard/StreakCard";
 import CategoryBudgets from "@/components/dashboard/CategoryBudgets";
-import GoalsDashlet from "@/components/dashboard/GoalsDashlet";
+import TrendChart from "@/components/dashboard/TrendChart";
+import BudgetPaceChart from "@/components/dashboard/BudgetPaceChart";
+import WeekdaySpendChart from "@/components/dashboard/WeekdaySpendChart";
+import TopMerchants from "@/components/dashboard/TopMerchants";
+import AiInsightsCard from "@/components/dashboard/AiInsightsCard";
 import RecurringCard, { type Recurring } from "@/components/dashboard/RecurringCard";
 import AddFAB from "@/components/dashboard/AddFAB";
 import DashboardSkeleton from "@/components/dashboard/DashboardSkeleton";
@@ -65,6 +69,7 @@ export default function DashboardPage() {
   const [txns, setTxns] = useState<Transaction[]>([]);
   const [recurring, setRecurring] = useState<Recurring[]>([]);
   const [monthBudget, setMonthBudget] = useState(DEFAULT_BUDGET);
+  const [catBudgets, setCatBudgets] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState<MonthRef>(() => currentMonth());
   const [showAllTxns, setShowAllTxns] = useState(false);
@@ -83,7 +88,17 @@ export default function DashboardPage() {
 
     // Transactions drive the initial skeleton → render as soon as they arrive.
     fetch("/api/transactions")
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (!r.ok) {
+          // Terminal: never leave the skeleton up on an error response.
+          if (!cancelled) {
+            if (r.status === 401) window.location.assign("/login");
+            setLoading(false);
+          }
+          return null;
+        }
+        return r.json();
+      })
       .then((rows) => {
         if (cancelled || !rows) return;
         setTxns(rows.map(fromDbTransaction));
@@ -97,6 +112,7 @@ export default function DashboardPage() {
       .then((me) => {
         if (cancelled || !me) return;
         if (typeof me.monthBudget === "number") setMonthBudget(me.monthBudget);
+        if (me.catBudgets && typeof me.catBudgets === "object") setCatBudgets(me.catBudgets);
       })
       .catch(() => {});
 
@@ -158,6 +174,17 @@ export default function DashboardPage() {
     setRecurring((prev) => prev.filter((r) => r.id !== id));
   };
 
+  const toggleRecurring = async (id: string, active: boolean) => {
+    const res = await fetch(`/api/recurring/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active }),
+    });
+    if (!res.ok) return;
+    const listRes = await fetch("/api/recurring");
+    if (listRes.ok) setRecurring(await listRes.json());
+  };
+
   const updateBudget = async (v: number) => {
     setMonthBudget(v);
     await fetch("/api/me", {
@@ -165,6 +192,17 @@ export default function DashboardPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ monthBudget: v }),
     });
+  };
+
+  const saveCatBudgets = async (next: Record<string, number>) => {
+    const res = await fetch("/api/me", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ catBudgets: next }),
+    });
+    if (!res.ok) return;
+    const me = await res.json();
+    setCatBudgets(me?.catBudgets && typeof me.catBudgets === "object" ? me.catBudgets : next);
   };
 
   const stats = useMemo(() => deriveStats(txns, selectedMonth), [txns, selectedMonth]);
@@ -178,8 +216,16 @@ export default function DashboardPage() {
     return out;
   }, [selectedMonth, stats.daysInMonth]);
   const insights = useMemo(
-    () => computeInsights({ txns, monthBudget, recurring, fmt, target: selectedMonth }),
-    [txns, monthBudget, recurring, fmt, selectedMonth],
+    () =>
+      computeInsights({
+        txns,
+        monthBudget,
+        catBudgets,
+        recurring: recurring.filter((r) => r.active),
+        fmt,
+        target: selectedMonth,
+      }),
+    [txns, monthBudget, catBudgets, recurring, fmt, selectedMonth],
   );
   const isCurrentMonth = isSameMonth(selectedMonth, currentMonth());
   const canGoForward = !isCurrentMonth;
@@ -192,12 +238,13 @@ export default function DashboardPage() {
     visible.monthGlance ||
     visible.streak ||
     visible.catBudgets ||
-    visible.goals;
+    visible.weekdays ||
+    visible.topMerchants;
   const monthTxns = useMemo(
     () => txns.filter((t) => {
       if (!t._dateISO) return false;
-      const d = new Date(t._dateISO);
-      return d.getFullYear() === selectedMonth.year && d.getMonth() === selectedMonth.month;
+      const p = isoToParts(t._dateISO);
+      return p.year === selectedMonth.year && p.month === selectedMonth.month;
     }),
     [txns, selectedMonth],
   );
@@ -205,7 +252,10 @@ export default function DashboardPage() {
     filter === "All" ? true : filter === "Income" ? t.type === "in" : t.type === "out"
   );
   const net = stats.inc - stats.exp;
-  const greetingName = user?.firstName ?? USER.first;
+  const statsHash = `${monthTxns.length}:${Math.round(stats.inc)}:${Math.round(stats.exp)}`;
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const greetingName = user?.firstName ?? "there";
 
   const editInitial: TransactionEditInitial | undefined = editingTxn
     ? {
@@ -214,7 +264,7 @@ export default function DashboardPage() {
         title: editingTxn.title,
         merchant: editingTxn.sub,
         category: editingTxn.cat,
-        date: editingTxn._dateISO ?? new Date().toISOString().slice(0, 10),
+        date: editingTxn._dateISO ?? localDateISO(new Date()),
         note: editingTxn.note ?? "",
       }
     : undefined;
@@ -236,7 +286,7 @@ export default function DashboardPage() {
         }}
       >
         <div>
-          <div className="kicker">Good afternoon, {greetingName}</div>
+          <div className="kicker">{greeting}, {greetingName}</div>
           <h1 className="display" style={{ fontSize: 28, fontWeight: 700, margin: "4px 0 0" }}>
             You&rsquo;re{" "}
             {net >= 0 ? (
@@ -434,6 +484,40 @@ export default function DashboardPage() {
             </div>
           )}
 
+          {visible.aiAnalysis && (
+            <div className="card pb-card" style={{ padding: "var(--card-pad, 22px)" }}>
+              <AiInsightsCard month={selectedMonth} statsHash={statsHash} />
+            </div>
+          )}
+
+          {(visible.trends || visible.budgetPace) && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  visible.trends && visible.budgetPace
+                    ? "repeat(auto-fit, minmax(280px, 1fr))"
+                    : "minmax(0, 1fr)",
+                gap: 18,
+              }}
+            >
+              {visible.trends && (
+                <div className="card pb-card" style={{ padding: "var(--card-pad, 22px)", minWidth: 0 }}>
+                  <TrendChart txns={txns} month={selectedMonth} />
+                </div>
+              )}
+              {visible.budgetPace && (
+                <div className="card pb-card" style={{ padding: "var(--card-pad, 22px)", minWidth: 0 }}>
+                  <BudgetPaceChart
+                    expSeries={stats.expSeries}
+                    monthBudget={monthBudget}
+                    month={selectedMonth}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
           {visible.spending && (
             <div className="card pb-card" style={{ padding: "var(--card-pad, 22px)" }}>
               <div
@@ -573,6 +657,7 @@ export default function DashboardPage() {
                   items={recurring}
                   onAddClick={() => setRecurringModalOpen(true)}
                   onRemove={removeRecurring}
+                  onToggleActive={toggleRecurring}
                 />
               </div>
             )}
@@ -610,28 +695,23 @@ export default function DashboardPage() {
                   </h3>
                   <span style={{ fontSize: 11, color: "var(--ink-3)" }}>This month</span>
                 </div>
-                <CategoryBudgets spendByCat={stats.spendByCat} budgets={CAT_BUDGETS} />
+                <CategoryBudgets
+                  spendByCat={stats.spendByCat}
+                  budgets={catBudgets}
+                  onSave={saveCatBudgets}
+                />
               </div>
             )}
 
-            {visible.goals && (
+            {visible.weekdays && (
               <div className="card pb-card" style={{ padding: "var(--card-pad-rail, 20px)" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 14,
-                  }}
-                >
-                  <h3 className="display" style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>
-                    Savings goals
-                  </h3>
-                  <button className="btn btn--ghost btn--sm">
-                    <IconPlus size={14} />
-                  </button>
-                </div>
-                <GoalsDashlet />
+                <WeekdaySpendChart txns={monthTxns} />
+              </div>
+            )}
+
+            {visible.topMerchants && (
+              <div className="card pb-card" style={{ padding: "var(--card-pad-rail, 20px)" }}>
+                <TopMerchants txns={monthTxns} />
               </div>
             )}
           </aside>

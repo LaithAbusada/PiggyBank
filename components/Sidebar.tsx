@@ -2,18 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Brand,
-  IconBolt,
-  IconCalculator,
-  IconCalendar,
-  IconFolder,
-  IconHome,
-  IconInvoice,
-  IconLifeBuoy,
-  IconSettings,
-  IconSparkle,
-} from "@/lib/icons";
+import { Brand, IconBolt, IconHome, IconSettings } from "@/lib/icons";
 import type { ComponentType } from "react";
 
 type NavItem = {
@@ -23,14 +12,9 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { href: "/dashboard",                label: "Dashboard",    icon: IconHome },
-  { href: "/dashboard/automations",    label: "Automations",  icon: IconBolt },
-  { href: "/dashboard/file-manager",   label: "File Manager", icon: IconFolder },
-  { href: "/dashboard/calendar",       label: "Calendar",     icon: IconCalendar },
-  { href: "/dashboard/invoicing",      label: "Invoicing",    icon: IconInvoice },
-  { href: "/dashboard/calculator",     label: "Calculator",   icon: IconCalculator },
-  { href: "/dashboard/settings",       label: "Settings",     icon: IconSettings },
-  { href: "/dashboard/support",        label: "Support",      icon: IconLifeBuoy },
+  { href: "/dashboard",             label: "Dashboard",   icon: IconHome },
+  { href: "/dashboard/automations", label: "Automations", icon: IconBolt },
+  { href: "/dashboard/settings",    label: "Settings",    icon: IconSettings },
 ];
 
 type Props = {
@@ -90,45 +74,6 @@ export default function Sidebar({ mobileOpen = false, onClose }: Props) {
             );
           })}
         </nav>
-        <div style={{ marginTop: "auto", padding: 12 }}>
-          <div
-            style={{
-              background: "var(--surface-2)",
-              borderRadius: 18,
-              padding: 14,
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 12,
-                  background: "var(--accent-soft)",
-                  color: "var(--accent-ink)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <IconSparkle size={16} />
-              </div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>Upgrade to Pro</div>
-                <div style={{ fontSize: 11, color: "var(--ink-3)" }}>Unlimited accounts</div>
-              </div>
-            </div>
-            <button
-              className="btn btn--ink btn--sm"
-              style={{ width: "100%", justifyContent: "center" }}
-            >
-              Try 30 days free
-            </button>
-          </div>
-        </div>
       </aside>
     </>
   );

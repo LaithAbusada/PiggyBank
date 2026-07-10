@@ -20,8 +20,9 @@ export async function POST(req: Request) {
   const user = await requireUser();
   if (!user) return new NextResponse("Unauthorized", { status: 401 });
 
-  const body = await req.json();
-  const { type, title, sub, note, cat, amount, date } = body ?? {};
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") return new NextResponse("Bad body", { status: 400 });
+  const { type, title, sub, note, cat, amount, date } = body;
 
   if (type !== "in" && type !== "out") return new NextResponse("Bad type", { status: 400 });
   if (typeof title !== "string" || !title.trim()) return new NextResponse("Bad title", { status: 400 });
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
       sub: typeof sub === "string" ? sub : "",
       note: typeof note === "string" && note.length ? note : null,
       cat: typeof cat === "string" && cat.length ? cat : "Other",
-      amount,
+      amount: type === "in" ? Math.abs(amount) : -Math.abs(amount),
       date: parsedDate,
     },
   });

@@ -18,7 +18,7 @@ export const formatMoney = (code: CurrencyCode, amount: number, opts: FmtOpts = 
   const max = opts.maximumFractionDigits ?? (opts.short ? 0 : 2);
   const num = converted.toLocaleString(undefined, { minimumFractionDigits: min, maximumFractionDigits: max });
   const sym = c.symbol;
-  return c.position === "post" ? `${num} ${sym}` : (sym.length > 1 ? `${sym} ${num}` : `${sym}${num}`);
+  return sym.length > 1 ? `${sym} ${num}` : `${sym}${num}`;
 };
 
 type CurrencyValue = {

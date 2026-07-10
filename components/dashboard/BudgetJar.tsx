@@ -10,16 +10,17 @@ type Props = {
 };
 
 export default function BudgetJar({ spent, budget, onSetBudget }: Props) {
-  const { fmt } = useCurrency();
+  const { fmt, rate } = useCurrency();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string | number>(budget);
   const pct = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0;
   const remaining = Math.max(0, budget - spent);
   const over = spent > budget;
 
+  // The input edits in the display currency; budget is stored in USD.
   const save = () => {
     const v = parseFloat(String(draft));
-    if (v > 0) onSetBudget(v);
+    if (v > 0) onSetBudget(v / rate);
     setEditing(false);
   };
 
@@ -136,7 +137,7 @@ export default function BudgetJar({ spent, budget, onSetBudget }: Props) {
           ) : (
             <button
               onClick={() => {
-                setDraft(budget);
+                setDraft(Math.round(budget * rate * 100) / 100);
                 setEditing(true);
               }}
               style={{ marginTop: 4, fontSize: 12, color: "var(--ink-3)", textDecoration: "underline" }}

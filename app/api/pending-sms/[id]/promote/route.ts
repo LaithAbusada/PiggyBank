@@ -36,7 +36,7 @@ export async function POST(
         sub: typeof b.sub === "string" ? b.sub : "",
         note: typeof b.note === "string" && b.note.length ? b.note : pending.raw,
         cat: b.cat.trim(),
-        amount: b.amount,
+        amount: b.type === "in" ? Math.abs(b.amount) : -Math.abs(b.amount),
         date,
         smsHash: pending.smsHash,
       },

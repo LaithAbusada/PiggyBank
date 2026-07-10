@@ -11,6 +11,9 @@ import {
 
 export type WidgetKey =
   | "cashflow"
+  | "aiAnalysis"
+  | "trends"
+  | "budgetPace"
   | "spending"
   | "transactions"
   | "insights"
@@ -20,15 +23,18 @@ export type WidgetKey =
   | "monthGlance"
   | "streak"
   | "catBudgets"
-  | "goals";
+  | "weekdays"
+  | "topMerchants";
 
 export type CashflowChart = "area" | "line" | "bar";
 export type SpendingChart = "donut" | "bar";
-export type CashflowRange = "7d" | "30d" | "90d" | "ytd";
 export type Density = "compact" | "cozy";
 
 export const WIDGET_META: Record<WidgetKey, { label: string; hint: string; rail: boolean }> = {
   cashflow:     { label: "Cashflow chart",       hint: "Income vs. expense over your chosen range.", rail: false },
+  aiAnalysis:   { label: "AI analysis",          hint: "A written read on your month, on demand.",    rail: false },
+  trends:       { label: "Monthly trends",       hint: "Income vs. expense over the last 6 months.",  rail: false },
+  budgetPace:   { label: "Budget pace",          hint: "Cumulative spend vs. an even budget pace.",   rail: false },
   spending:     { label: "Where your money went", hint: "Category breakdown for the month.",          rail: false },
   transactions: { label: "All transactions",     hint: "List with Income/Expense filters.",           rail: false },
   insights:     { label: "Insights",             hint: "Automated observations about your spending.", rail: true },
@@ -38,27 +44,13 @@ export const WIDGET_META: Record<WidgetKey, { label: string; hint: string; rail:
   monthGlance:  { label: "Month at a glance",    hint: "Pacing against the month.",                   rail: true },
   streak:       { label: "Streak",               hint: "Days in a row you've logged activity.",       rail: true },
   catBudgets:   { label: "Category budgets",     hint: "Per-category spending vs. caps.",             rail: true },
-  goals:        { label: "Savings goals",        hint: "Progress toward your saved targets.",         rail: true },
-};
-
-export const RANGE_LABELS: Record<CashflowRange, string> = {
-  "7d": "7 days",
-  "30d": "30 days",
-  "90d": "90 days",
-  ytd: "Year to date",
-};
-
-export const RANGE_DAYS: Record<CashflowRange, number> = {
-  "7d": 7,
-  "30d": 30,
-  "90d": 90,
-  ytd: Math.max(1, Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / 86_400_000) + 1),
+  weekdays:     { label: "Weekday pattern",      hint: "Which days of the week you spend most.",      rail: true },
+  topMerchants: { label: "Top merchants",        hint: "Where the biggest chunks went this month.",   rail: true },
 };
 
 export type DashboardPrefs = {
   visible: Record<WidgetKey, boolean>;
   cashflowChart: CashflowChart;
-  cashflowRange: CashflowRange;
   spendingChart: SpendingChart;
   density: Density;
 };
@@ -66,6 +58,9 @@ export type DashboardPrefs = {
 export const DEFAULT_PREFS: DashboardPrefs = {
   visible: {
     cashflow: true,
+    aiAnalysis: true,
+    trends: true,
+    budgetPace: true,
     spending: true,
     transactions: true,
     insights: true,
@@ -75,10 +70,10 @@ export const DEFAULT_PREFS: DashboardPrefs = {
     monthGlance: true,
     streak: true,
     catBudgets: true,
-    goals: true,
+    weekdays: true,
+    topMerchants: true,
   },
   cashflowChart: "area",
-  cashflowRange: "30d",
   spendingChart: "donut",
   density: "cozy",
 };

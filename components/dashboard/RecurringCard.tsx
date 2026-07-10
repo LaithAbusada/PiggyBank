@@ -12,6 +12,7 @@ export type Recurring = {
   cat: string;
   amount: number;
   dayOfMonth: number;
+  active: boolean;
 };
 
 const ordinal = (n: number) => {
@@ -20,19 +21,34 @@ const ordinal = (n: number) => {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 };
 
+const IconPause = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <path d="M9 5v14M15 5v14" />
+  </svg>
+);
+
+const IconPlay = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none">
+    <path d="M8 5l11 7-11 7z" />
+  </svg>
+);
+
 export default function RecurringCard({
   items,
   onAddClick,
   onRemove,
+  onToggleActive,
 }: {
   items: Recurring[];
   onAddClick: () => void;
   onRemove: (id: string) => Promise<void> | void;
+  onToggleActive: (id: string, active: boolean) => Promise<void> | void;
 }) {
   const { fmt } = useCurrency();
 
-  const monthlyIn = items.filter((r) => r.type === "in").reduce((s, r) => s + r.amount, 0);
-  const monthlyOut = items.filter((r) => r.type === "out").reduce((s, r) => s + r.amount, 0);
+  const activeItems = items.filter((r) => r.active);
+  const monthlyIn = activeItems.filter((r) => r.type === "in").reduce((s, r) => s + r.amount, 0);
+  const monthlyOut = activeItems.filter((r) => r.type === "out").reduce((s, r) => s + r.amount, 0);
 
   return (
     <div>
@@ -128,6 +144,7 @@ export default function RecurringCard({
                   padding: "10px 12px",
                   borderRadius: 12,
                   background: "var(--surface-2)",
+                  opacity: r.active ? 1 : 0.55,
                 }}
               >
                 <div
@@ -158,6 +175,7 @@ export default function RecurringCard({
                     {r.title}
                   </div>
                   <div style={{ fontSize: 11, color: "var(--ink-3)" }}>
+                    {!r.active && <span style={{ fontWeight: 600 }}>Paused · </span>}
                     {ordinal(r.dayOfMonth)} · {r.cat}
                   </div>
                 </div>
@@ -172,6 +190,24 @@ export default function RecurringCard({
                   {r.type === "in" ? "+" : "-"}
                   {fmt(r.amount, { short: true })}
                 </div>
+                <button
+                  onClick={() => onToggleActive(r.id, !r.active)}
+                  aria-label={r.active ? `Pause ${r.title}` : `Resume ${r.title}`}
+                  title={r.active ? "Pause" : "Resume"}
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 8,
+                    background: "var(--surface)",
+                    color: "var(--ink-3)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  {r.active ? <IconPause size={13} /> : <IconPlay size={13} />}
+                </button>
                 <button
                   onClick={() => onRemove(r.id)}
                   aria-label={`Remove ${r.title}`}

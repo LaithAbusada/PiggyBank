@@ -12,6 +12,9 @@ export default clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {
     const { userId } = await auth();
     if (!userId) {
+      if (request.nextUrl.pathname.startsWith("/api")) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
       return NextResponse.redirect(new URL("/login", request.url));
     }
   }

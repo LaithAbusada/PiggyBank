@@ -9,8 +9,10 @@ export async function requireUser() {
   if (existing) return existing;
 
   const cu = await currentUser();
-  return prisma.user.create({
-    data: {
+  return prisma.user.upsert({
+    where: { id: userId },
+    update: {},
+    create: {
       id: userId,
       email: cu?.emailAddresses?.[0]?.emailAddress ?? null,
     },

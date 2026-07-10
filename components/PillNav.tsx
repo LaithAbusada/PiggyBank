@@ -8,7 +8,6 @@ import { PiggyNose } from "@/lib/icons";
 const links = [
   { href: "/", label: "Home" },
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/dashboard/calculator", label: "Calculator" },
   { href: "/dashboard/settings", label: "Settings" },
 ];
 

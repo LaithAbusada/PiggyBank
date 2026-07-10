@@ -1,4 +1,4 @@
-import { CAT_BUDGETS, currentMonth, isSameMonth, type MonthRef, type Transaction } from "./dashboard-data";
+import { currentMonth, isoToParts, isSameMonth, type MonthRef, type Transaction } from "./dashboard-data";
 
 export type InsightTone = "good" | "warn" | "neutral";
 export type InsightIcon = "trendUp" | "trendDown" | "sparkle" | "bolt" | "wallet" | "category";
@@ -18,20 +18,19 @@ type RecurringLite = { type: "in" | "out"; amount: number };
 type Input = {
   txns: Transaction[];
   monthBudget: number;
+  catBudgets: Record<string, number>;
   recurring: RecurringLite[];
   fmt: (n: number, opts?: { short?: boolean }) => string;
   target?: MonthRef;
 };
 
-function dateOf(t: Transaction): Date {
-  return t._dateISO ? new Date(t._dateISO) : new Date();
+function txnInMonth(t: Transaction, ref: MonthRef) {
+  if (!t._dateISO) return false;
+  const p = isoToParts(t._dateISO);
+  return p.year === ref.year && p.month === ref.month;
 }
 
-function dateInMonth(d: Date, ref: MonthRef) {
-  return d.getFullYear() === ref.year && d.getMonth() === ref.month;
-}
-
-export function computeInsights({ txns, monthBudget, recurring, fmt, target }: Input): Insight[] {
+export function computeInsights({ txns, monthBudget, catBudgets, recurring, fmt, target }: Input): Insight[] {
   const out: Insight[] = [];
   const ref = target ?? currentMonth();
   const today = new Date();
@@ -43,9 +42,9 @@ export function computeInsights({ txns, monthBudget, recurring, fmt, target }: I
   const prev = new Date(y, m - 1, 1);
   const prevRef: MonthRef = { year: prev.getFullYear(), month: prev.getMonth() };
 
-  const thisMonthOut = txns.filter((t) => t.type === "out" && dateInMonth(dateOf(t), ref));
-  const thisMonthIn = txns.filter((t) => t.type === "in" && dateInMonth(dateOf(t), ref));
-  const lastMonthOut = txns.filter((t) => t.type === "out" && dateInMonth(dateOf(t), prevRef));
+  const thisMonthOut = txns.filter((t) => t.type === "out" && txnInMonth(t, ref));
+  const thisMonthIn = txns.filter((t) => t.type === "in" && txnInMonth(t, ref));
+  const lastMonthOut = txns.filter((t) => t.type === "out" && txnInMonth(t, prevRef));
 
   const spent = thisMonthOut.reduce((s, t) => s + Math.abs(t.amount), 0);
   const income = thisMonthIn.reduce((s, t) => s + Math.abs(t.amount), 0);
@@ -145,7 +144,7 @@ export function computeInsights({ txns, monthBudget, recurring, fmt, target }: I
 
   // 4. Category over its budget
   for (const [cat, amt] of sortedCats) {
-    const cap = CAT_BUDGETS[cat];
+    const cap = catBudgets[cat];
     if (cap && amt > cap) {
       const over = amt - cap;
       out.push({
@@ -178,7 +177,6 @@ export function computeInsights({ txns, monthBudget, recurring, fmt, target }: I
 
   // 6. Recurring commitments total
   const recurringOut = recurring.filter((r) => r.type === "out").reduce((s, r) => s + r.amount, 0);
-  const recurringIn = recurring.filter((r) => r.type === "in").reduce((s, r) => s + r.amount, 0);
   if (recurringOut > 0) {
     const discretionary = Math.max(0, monthBudget - recurringOut);
     out.push({
@@ -241,9 +239,6 @@ export function computeInsights({ txns, monthBudget, recurring, fmt, target }: I
       });
     }
   }
-
-  // silence the unused warning
-  void recurringIn;
 
   return out.sort((a, b) => b.priority - a.priority);
 }

@@ -49,30 +49,35 @@ export async function materializeRecurring(userId: string, now: Date = new Date(
 
     if (!toCreate.length) continue;
 
-    for (const { ym } of toCreate) {
-      const { y, m } = parseYm(ym);
-      const daysInMonth = new Date(y, m + 1, 0).getDate();
-      const day = Math.min(Math.max(1, r.dayOfMonth), daysInMonth);
-      const date = new Date(y, m, day, 9, 0, 0);
-
-      await prisma.transaction.create({
-        data: {
-          userId: r.userId,
-          type: r.type,
-          title: r.title,
-          sub: r.sub,
-          note: r.note,
-          cat: r.cat,
-          amount: r.type === "in" ? Math.abs(r.amount) : -Math.abs(r.amount),
-          date,
-        },
+    created += await prisma.$transaction(async (tx) => {
+      // Optimistic claim on the previous lastRunYm value (null works too):
+      // if another concurrent run already advanced it, count is 0 and we skip.
+      const claim = await tx.recurring.updateMany({
+        where: { id: r.id, lastRunYm: r.lastRunYm },
+        data: { lastRunYm: toCreate[toCreate.length - 1].ym },
       });
-      created++;
-    }
+      if (claim.count === 0) return 0;
 
-    await prisma.recurring.update({
-      where: { id: r.id },
-      data: { lastRunYm: toCreate[toCreate.length - 1].ym },
+      for (const { ym } of toCreate) {
+        const { y, m } = parseYm(ym);
+        const daysInMonth = new Date(y, m + 1, 0).getDate();
+        const day = Math.min(Math.max(1, r.dayOfMonth), daysInMonth);
+        const date = new Date(y, m, day, 9, 0, 0);
+
+        await tx.transaction.create({
+          data: {
+            userId: r.userId,
+            type: r.type,
+            title: r.title,
+            sub: r.sub,
+            note: r.note,
+            cat: r.cat,
+            amount: r.type === "in" ? Math.abs(r.amount) : -Math.abs(r.amount),
+            date,
+          },
+        });
+      }
+      return toCreate.length;
     });
   }
 

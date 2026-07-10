@@ -2,9 +2,11 @@ import { createHash } from "crypto";
 import { prisma } from "./prisma";
 import { CURRENCIES, isCurrencyCode } from "./currencies";
 
+// Day-bucketed: same-day retries of the same message (with drifting
+// timestamps) dedupe, while an identical purchase on a later day does not.
 export function hashSms(raw: string, receivedAt: Date): string {
   return createHash("sha256")
-    .update(`${raw}|${receivedAt.toISOString()}`)
+    .update(`${raw.trim()}|${receivedAt.toISOString().slice(0, 10)}`)
     .digest("hex");
 }
 

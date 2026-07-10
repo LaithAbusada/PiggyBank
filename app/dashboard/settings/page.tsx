@@ -132,7 +132,7 @@ const TABS = [
 type TabId = (typeof TABS)[number]["id"];
 
 export default function SettingsPage() {
-  const { code, setCode } = useCurrency();
+  const { code, setCode, rate } = useCurrency();
   const { accent, setAccent } = useAccent();
   const { user } = useUser();
   const { signOut, openUserProfile } = useClerk();
@@ -140,6 +140,7 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<TabId>("profile");
 
   const [monthBudget, setMonthBudget] = useState<string>("");
+  const [budgetUsd, setBudgetUsd] = useState<number | null>(null);
   const [budgetSaving, setBudgetSaving] = useState(false);
   const [budgetSaved, setBudgetSaved] = useState(false);
 
@@ -154,11 +155,16 @@ export default function SettingsPage() {
         const res = await fetch("/api/me");
         if (res.ok) {
           const data = await res.json();
-          if (typeof data.monthBudget === "number") setMonthBudget(String(data.monthBudget));
+          if (typeof data.monthBudget === "number") setBudgetUsd(data.monthBudget);
         }
       } catch {}
     })();
   }, []);
+
+  // The input edits in the display currency; the DB stores USD.
+  useEffect(() => {
+    if (budgetUsd != null) setMonthBudget(String(Math.round(budgetUsd * rate * 100) / 100));
+  }, [budgetUsd, rate]);
 
   const fullName =
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Your account";
@@ -173,15 +179,17 @@ export default function SettingsPage() {
   const saveBudget = async () => {
     const n = parseFloat(monthBudget);
     if (!isFinite(n) || n <= 0) return;
+    const usd = n / rate;
     setBudgetSaving(true);
     setBudgetSaved(false);
     try {
       const res = await fetch("/api/me", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ monthBudget: n }),
+        body: JSON.stringify({ monthBudget: usd }),
       });
       if (res.ok) {
+        setBudgetUsd(usd);
         setBudgetSaved(true);
         setTimeout(() => setBudgetSaved(false), 1800);
       }

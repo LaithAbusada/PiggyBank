@@ -59,6 +59,24 @@ export default function DashboardSkeleton() {
 
           <div className="card" style={{ padding: 22 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
+              <Bar w={140} h={18} />
+              <Bar w={110} h={30} r={999} />
+            </div>
+            <Bar w="80%" h={12} />
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18 }}>
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className="card" style={{ padding: 22, display: "flex", flexDirection: "column", gap: 12 }}>
+                <Bar w={130} h={16} />
+                <Bar w={180} h={10} />
+                <Block h={150} r={14} />
+              </div>
+            ))}
+          </div>
+
+          <div className="card" style={{ padding: 22 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
               <Bar w={210} h={18} />
               <Bar w={80} h={22} r={999} />
             </div>

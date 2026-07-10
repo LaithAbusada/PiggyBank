@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useCurrency } from "@/lib/currency";
-import { CATEGORIES_OPTIONS, type TransactionInput } from "@/lib/dashboard-data";
+import { CATEGORIES_OPTIONS, localDateISO, type TransactionInput } from "@/lib/dashboard-data";
 import {
   IconArrowDown,
   IconArrowUp,
@@ -31,7 +31,7 @@ type Props = {
 
 export default function AddTransactionModal({ open, onClose, onAdd, initial, mode = "add", onDelete }: Props) {
   const { sym, rate } = useCurrency();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateISO(new Date());
   const [type, setType] = useState<"in" | "out">(initial?.type ?? "out");
   const [amount, setAmount] = useState(initial ? String(initial.amount) : "");
   const [title, setTitle] = useState(initial?.title ?? "");
@@ -78,7 +78,8 @@ export default function AddTransactionModal({ open, onClose, onAdd, initial, mod
         note: note.trim(),
         cat: category,
         amount: type === "in" ? Math.abs(baseAmt) : -Math.abs(baseAmt),
-        date: new Date(date).toISOString(),
+        // Encode the chosen calendar day as exactly UTC midnight — the date-only sentinel.
+        date: new Date(date + "T00:00:00Z").toISOString(),
       });
       reset();
       onClose();

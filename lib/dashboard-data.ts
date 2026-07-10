@@ -33,12 +33,33 @@ type DbTransaction = {
   date: string;
 };
 
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** Local-date key (YYYY-MM-DD) built from local getters — no UTC shift for users west of UTC. */
+export function localDateISO(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+/** Parse a YYYY-MM-DD key by string-splitting (no Date re-parsing). `month` is 0-based like MonthRef. */
+export function isoToParts(iso: string): { year: number; month: number; day: number } {
+  const [y, m, d] = iso.split("-").map(Number);
+  return { year: y, month: m - 1, day: d };
+}
+
 export function fromDbTransaction(row: DbTransaction): Transaction {
   const d = new Date(row.date);
-  const when =
-    d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
-    ", " +
-    d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  // Invariant: an instant at exactly UTC midnight is a date-only sentinel (manual entries
+  // store just the calendar day), so decode it from UTC parts — never shift to local time.
+  const isDateOnly =
+    d.getUTCHours() === 0 &&
+    d.getUTCMinutes() === 0 &&
+    d.getUTCSeconds() === 0 &&
+    d.getUTCMilliseconds() === 0;
+  const when = isDateOnly
+    ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })
+    : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) +
+      ", " +
+      d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
   return {
     id: row.id,
     type: row.type === "in" ? "in" : "out",
@@ -48,29 +69,11 @@ export function fromDbTransaction(row: DbTransaction): Transaction {
     cat: row.cat,
     amount: row.amount,
     when,
-    _dateISO: d.toISOString().slice(0, 10),
+    _dateISO: isDateOnly ? d.toISOString().slice(0, 10) : localDateISO(d),
   };
 }
 
-export const USER = {
-  name: "Laith Abusada",
-  first: "Laith",
-  handle: "@laith.abs",
-  email: "laith@piggybank.app",
-  balance: 8367.42,
-  cardNumber: "•••• •••• •••• 4747",
-  cardExp: "02/27",
-};
-
 export const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-export const RECENT_PEOPLE = [
-  { name: "Farah",  initials: "FA", bg: "linear-gradient(135deg, #fde68a, #fb923c)" },
-  { name: "Awad",   initials: "AW", bg: "linear-gradient(135deg, #a7f3d0, #34d399)" },
-  { name: "Maya",   initials: "MS", bg: "linear-gradient(135deg, #c4b5fd, #8b5cf6)" },
-  { name: "Nadia",  initials: "NK", bg: "linear-gradient(135deg, #fecaca, #f472b6)" },
-  { name: "Omar",   initials: "OJ", bg: "linear-gradient(135deg, #bae6fd, #38bdf8)" },
-];
 
 export const CATEGORIES_OPTIONS = [
   { key: "Restaurants",    color: "oklch(0.55 0.20 295)" },
@@ -85,15 +88,6 @@ export const CATEGORIES_OPTIONS = [
   { key: "Transfer",       color: "oklch(0.62 0.16 250)" },
   { key: "Other",          color: "oklch(0.60 0.02 280)" },
 ];
-
-export const CAT_BUDGETS: Record<string, number> = {
-  Restaurants: 400,
-  Groceries: 350,
-  Transportation: 200,
-  Utilities: 150,
-  Entertainment: 120,
-  Shopping: 200,
-};
 
 export type DerivedStats = {
   inc: number;
@@ -142,11 +136,10 @@ export function deriveStats(txns: Transaction[], target: MonthRef = currentMonth
       ? 0
       : daysInMonth;
 
-  const dateOf = (t: Transaction) => (t._dateISO ? new Date(t._dateISO) : null);
   const inMonth = (t: Transaction) => {
-    const d = dateOf(t);
-    if (!d) return false;
-    return d.getFullYear() === year && d.getMonth() === month;
+    if (!t._dateISO) return false;
+    const p = isoToParts(t._dateISO);
+    return p.year === year && p.month === month;
   };
   const monthTxns = txns.filter(inMonth);
 
@@ -168,9 +161,8 @@ export function deriveStats(txns: Transaction[], target: MonthRef = currentMonth
   const incSeries = Array(daysInMonth).fill(0);
   const expSeries = Array(daysInMonth).fill(0);
   monthTxns.forEach((t) => {
-    const d = dateOf(t);
-    if (!d) return;
-    const idx = d.getDate() - 1;
+    if (!t._dateISO) return;
+    const idx = isoToParts(t._dateISO).day - 1;
     if (idx < 0 || idx >= daysInMonth) return;
     if (t.type === "in") incSeries[idx] += Math.abs(t.amount);
     else expSeries[idx] += Math.abs(t.amount);
@@ -190,9 +182,3 @@ export function monthDayLabels(target: MonthRef = currentMonth()): string[] {
   }
   return out;
 }
-
-export const GOALS = [
-  { name: "Tokyo trip",     saved: 1840, target: 4500, emoji: "✈️", color: "oklch(0.70 0.16 275)" },
-  { name: "Emergency fund", saved: 3200, target: 5000, emoji: "🛟", color: "oklch(0.68 0.15 155)" },
-  { name: "New MacBook",    saved: 620,  target: 2200, emoji: "💻", color: "oklch(0.72 0.14 70)" },
-];

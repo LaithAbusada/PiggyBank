@@ -125,12 +125,22 @@ export default function ParseRuleModal({ open, onClose, onSave, initial, sampleR
   const [testSms, setTestSms] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [aiInstructions, setAiInstructions] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiNotice, setAiNotice] = useState<string | null>(null);
+  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setRule(initial ?? emptyRule);
     setTestSms(sampleRaw ?? "");
     setErr(null);
+    setAiInstructions("");
+    setAiLoading(false);
+    setAiError(null);
+    setAiNotice(null);
+    setAiExplanation(null);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
@@ -177,6 +187,83 @@ export default function ParseRuleModal({ open, onClose, onSave, initial, sampleR
       setErr(e instanceof Error ? e.message : "Failed to save");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const generateWithAi = async () => {
+    if (aiLoading) return;
+    setAiError(null);
+    setAiNotice(null);
+    if (!testSms.trim()) {
+      setAiNotice("Paste a sample SMS above first so the AI has something to work from.");
+      return;
+    }
+    setAiLoading(true);
+    setAiExplanation(null);
+    try {
+      const hasCurrent = !!(rule.amountRegex.trim() || rule.merchantRegex.trim());
+      const res = await fetch("/api/ai/regex", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sample: testSms,
+          ...(aiInstructions.trim() ? { instructions: aiInstructions.trim() } : {}),
+          ...(hasCurrent
+            ? {
+                currentRule: {
+                  name: rule.name,
+                  senderPattern: rule.senderPattern,
+                  contentPattern: rule.contentPattern,
+                  amountRegex: rule.amountRegex,
+                  merchantRegex: rule.merchantRegex,
+                  currencyRegex: rule.currencyRegex,
+                  type: rule.type,
+                  defaultCategory: rule.defaultCategory,
+                  currency: rule.currency,
+                },
+              }
+            : {}),
+        }),
+      });
+      if (!res.ok) {
+        let notConfigured = false;
+        let msg = "AI request failed — try again.";
+        try {
+          const data = await res.json();
+          if (res.status === 503 && data?.error === "AI_NOT_CONFIGURED") notConfigured = true;
+          else if (typeof data?.error === "string" && data.error) msg = data.error;
+        } catch {}
+        if (notConfigured) {
+          setAiNotice(
+            "AI assistant is not configured — add ANTHROPIC_API_KEY to .env.local (and Vercel) to enable."
+          );
+        } else {
+          setAiError(msg);
+        }
+        return;
+      }
+      const data = await res.json();
+      const r = data?.rule ?? {};
+      setRule((prev) => ({
+        ...prev,
+        name: prev.name.trim() ? prev.name : typeof r.name === "string" ? r.name : prev.name,
+        senderPattern: typeof r.senderPattern === "string" && r.senderPattern ? r.senderPattern : null,
+        contentPattern: typeof r.contentPattern === "string" && r.contentPattern ? r.contentPattern : null,
+        amountRegex: typeof r.amountRegex === "string" ? r.amountRegex : prev.amountRegex,
+        merchantRegex: typeof r.merchantRegex === "string" ? r.merchantRegex : prev.merchantRegex,
+        currencyRegex: typeof r.currencyRegex === "string" && r.currencyRegex ? r.currencyRegex : null,
+        type: r.type === "in" ? "in" : "out",
+        defaultCategory:
+          typeof r.defaultCategory === "string" && r.defaultCategory
+            ? r.defaultCategory
+            : prev.defaultCategory,
+        currency: isCurrencyCode(r.currency) ? r.currency : prev.currency,
+      }));
+      setAiExplanation(typeof data?.explanation === "string" ? data.explanation : "");
+    } catch {
+      setAiError("Network error — try again.");
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -390,6 +477,80 @@ export default function ParseRuleModal({ open, onClose, onSave, initial, sampleR
               onChange={(e) => setTestSms(e.target.value)}
               placeholder="Paste a sample SMS to see what your regex extracts"
             />
+
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--line)" }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <input
+                  style={{ ...fieldStyle, flex: 1, minWidth: 200 }}
+                  value={aiInstructions}
+                  onChange={(e) => setAiInstructions(e.target.value)}
+                  placeholder="Optional instructions, e.g. the merchant comes after the word 'at'"
+                />
+                <button
+                  type="button"
+                  className="btn btn--ink btn--sm"
+                  onClick={generateWithAi}
+                  disabled={aiLoading}
+                  style={{ whiteSpace: "nowrap" }}
+                >
+                  {aiLoading ? (
+                    <>
+                      <span className="pb-spin" /> Generating…
+                    </>
+                  ) : (
+                    <>✨ Generate with AI</>
+                  )}
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 5 }}>
+                Let AI write the regexes from the sample SMS above
+                {rule.amountRegex.trim() || rule.merchantRegex.trim()
+                  ? " — your current patterns are sent along so it can fix them."
+                  : "."}
+              </div>
+              {aiNotice && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: "8px 12px",
+                    background: "var(--surface)",
+                    border: "1px dashed var(--line)",
+                    borderRadius: 10,
+                    fontSize: 12,
+                    color: "var(--ink-2)",
+                    lineHeight: 1.55,
+                  }}
+                >
+                  {aiNotice}
+                </div>
+              )}
+              {aiError && (
+                <div style={{ marginTop: 8, fontSize: 12, color: "oklch(0.5 0.2 25)" }}>
+                  {aiError}
+                </div>
+              )}
+              {aiExplanation !== null && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: "10px 12px",
+                    background: "var(--surface)",
+                    border: "1px solid var(--line)",
+                    borderRadius: 10,
+                    fontSize: 12,
+                    color: "var(--ink-2)",
+                    lineHeight: 1.55,
+                  }}
+                >
+                  {aiExplanation}
+                  <div style={{ marginTop: 4, color: "var(--ink-3)" }}>
+                    Rule fields updated — the live test results below show whether it fires on
+                    your sample.
+                  </div>
+                </div>
+              )}
+            </div>
+
             {testSms && (
               <div style={{ marginTop: 10, display: "grid", gap: 4 }}>
                 <TestRow label="Sender filter" res={senderOk} />
